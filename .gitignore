@@ -3,6 +3,7 @@ config.toml
 *.key
 
 # Environments & Tests
+.env
 venv/
 .venv/
 tests/

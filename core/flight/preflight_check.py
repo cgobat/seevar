@@ -1,90 +1,59 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Objective: Executes full system validation including Targets, GPS, Bridge, Weather, and Disk.
+Filename: core/flight/preflight_check.py
+Version: 1.4.6 (Kriel)
 """
-#
-# Seestar Organizer - Pre-Flight Check
-# Path: ~/seestar_organizer/core/flight/preflight_check.py
-# ----------------------------------------------------------------
-
-import json
-import os
-import sys
-import socket
-import time
+import json, os, sys, socket, time, subprocess, re, tomllib, urllib.request
+from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from core.flight.vault_manager import VaultManager
-from core.preflight.weather import WeatherOracle
-from core.utils.disk_monitor import DiskMonitor
 from core.preflight.target_evaluator import TargetEvaluator
 
-PREFLIGHT_DATA = os.path.expanduser("~/seestar_organizer/core/flight/data/preflight_status.json")
-
-def get_gps_fix():
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(2.0)
-            s.connect(('127.0.0.1', 2947))
-            s.sendall(b'?WATCH={"enable":true,"json":true}\n')
-            start = time.time()
-            while time.time() - start < 2.0:
-                data = s.recv(4096).decode('utf-8')
-                for line in data.split('\n'):
-                    if not line.strip(): continue
-                    try:
-                        msg = json.loads(line)
-                        if msg.get('class') == 'TPV' and msg.get('mode', 0) >= 2:
-                            return "OK", msg['lat'], msg['lon']
-                    except json.JSONDecodeError: continue
-        return "TRYING", 0.0, 0.0
-    except Exception: return "BAD", 0.0, 0.0
-
-def get_maidenhead(lat, lon):
-    if lat == 0.0: return "WAITING"
-    A, B = lon + 180, lat + 90
-    mh = chr(ord('A')+int(A//20)) + chr(ord('A')+int(B//10)) + str(int((A%20)//2)) + str(int(B%10))
-    return mh
+CONFIG_PATH = os.path.expanduser("~/seestar_organizer/config.toml")
+SHM_STATUS = "/dev/shm/env_status.json"
 
 def check_vitals():
-    vault, oracle, disk_mon, target_eval = VaultManager(), WeatherOracle(), DiskMonitor(), TargetEvaluator()
+    with open(CONFIG_PATH, "rb") as f: cfg = tomllib.load(f)
     
-    # 1. Hardware/Weather/Disk
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1)
-    bridge_ok = "OK" if s.connect_ex(('127.0.0.1', 5555)) == 0 else "BAD"
-    s.close()
+    # 📡 GPS & Time
+    try:
+        with socket.create_connection(("127.0.0.1", 2947), timeout=1) as s:
+            s.sendall(b'?WATCH={"enable":true,"json":true};\n')
+            msg = json.loads(s.makefile().readline())
+            gps_stat, lat, lon = ("OK", msg.get('lat'), msg.get('lon')) if msg.get('class') == 'TPV' else ("WAITING", 0, 0)
+    except: gps_stat, lat, lon = "BAD", 0, 0
 
-    gps_status, real_lat, real_lon = get_gps_fix()
-    if gps_status == "OK":
-        vault.sync_gps(real_lat, real_lon, get_maidenhead(real_lat, real_lon))
+    try:
+        res = subprocess.check_output(['chronyc', 'tracking'], text=True)
+        stratum = int(re.search(r"Stratum\s+:\s+(\d+)", res).group(1))
+        pps_led, offset = ("led-green", f"{float(re.search(r'Last offset\s+:\s+([+-]?\d+\.\d+)', res).group(1))*1000:.2f}ms") if stratum < 16 else ("led-orange", "SYNCING")
+    except: pps_led, offset = "led-red", "NO SYNC"
 
-    weather_report = oracle.get_consensus()
-    disk_report = disk_mon.check_vitals()
-    target_report = target_eval.evaluate()
-    obs = vault.get_observer_config()
+    # 🎯 Tactical Queue
+    evaluator = TargetEvaluator()
+    manifest = evaluator.evaluate()
+
+    # 📦 Science Log Check (for the Science LED)
+    qc_path = Path("~/seestar_organizer/core/postflight/data/qc_report.json").expanduser()
+    science_led = "led-green" if qc_path.exists() and os.path.getsize(qc_path) > 2 else "led-grey"
 
     status = {
-        "bridge": bridge_ok,
-        "gps": gps_status,
-        "weather": weather_report["status"], "weather_led": weather_report["led"],
-        "disk": disk_report["status"], "disk_led": disk_report["led"],
-        "targets": target_report["status"], "targets_led": target_report["led"],
-        "location_maidenhead": obs.get("maidenhead", "ERR"),
-        "observer_id": obs.get("observer_id", "ERR"),
-        "jd": round(2440587.5 + time.time() / 86400.0, 4)
+        "maidenhead": cfg.get("location", {}).get("maidenhead", "JO22hj"),
+        "gps_led": "led-green" if gps_stat == "OK" else "led-orange",
+        "pps_led": pps_led,
+        "pps_offset": offset,
+        "weather_led": "led-orange", # Environment
+        "fog_led": "led-grey",       # Hardware Pending
+        "science_led": science_led,  # Accountant Status
+        "targets": manifest['status'],
+        "targets_led": manifest['led'],
+        "jd": round(2440587.5 + time.time() / 86400.0, 4),
+        "bridge": "led-green" if socket.socket().connect_ex(('127.0.0.1', 5432)) == 0 else "led-red"
     }
 
-    os.makedirs(os.path.dirname(PREFLIGHT_DATA), exist_ok=True)
-    with open(PREFLIGHT_DATA, 'w') as f: json.dump(status, f)
-        
-    print("\n🚀 === PRE-FLIGHT VITALS REPORT ===")
-    print(f"   GPS / BRIDGE     : {status['gps']} / {status['bridge']}")
-    print(f"   WEATHER (PRED)   : {status['weather']}")
-    print(f"   DISK STORAGE     : {status['disk']}")
-    print(f"   TARGET MANIFEST  : {status['targets']}")
-    print("===================================\n")
+    with open(SHM_STATUS, 'w') as f: json.dump(status, f)
+    print(f"✅ Preflight Complete: {status['maidenhead']} | GPS: {gps_stat}")
 
 if __name__ == "__main__":
     check_vitals()

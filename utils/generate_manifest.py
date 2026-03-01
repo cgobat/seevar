@@ -10,7 +10,7 @@ import os, re, shutil
 
 ROOT_DIR = os.path.expanduser("~/seestar_organizer")
 MANIFEST_PATH = os.path.join(ROOT_DIR, "FILE_MANIFEST.md")
-NAS_DIR = "/mnt/astronas/1.2"
+NAS_DIR = "/mnt/astronas/"
 
 def get_clean_objective(filepath):
     try:

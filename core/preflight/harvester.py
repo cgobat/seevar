@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/preflight/harvester.py
-Version: 1.2.0 (Pee Pastinakel)
-Objective: Downloads active campaigns from AAVSO, vetoing targets outside FOV constraints.
+Version: 1.2.1 (Hardened)
+Objective: Downloads active campaigns from AAVSO, vetoing targets outside FOV constraints and enforcing path resolution via config.toml.
 """
 
 import os
@@ -14,9 +14,8 @@ import tomllib
 import logging
 from pathlib import Path
 
-# Setup logging
 project_root = Path(__file__).parent.parent.parent
-log_file = project_root / "data/logs/harvester.log"
+log_file = project_root / "logs/harvester.log"
 os.makedirs(log_file.parent, exist_ok=True)
 
 logging.basicConfig(
@@ -27,23 +26,32 @@ logging.basicConfig(
 logger = logging.getLogger("Harvester")
 
 def harvest():
-    # 1. Setup & Inventory
     config_path = project_root / "config.toml"
+    if not config_path.exists():
+        logger.error("❌ config.toml missing. Path resolution failed.")
+        sys.exit(1)
+
     with open(config_path, "rb") as f:
         config = tomllib.load(f)
-    api_key = config['aavso']['target_tool_key']
+    
+    # FIXED: Now matches your config.toml
+    api_key = config.get('aavso', {}).get('target_key')
+    if not api_key:
+        logger.error("❌ AAVSO 'target_key' not found in config.toml.")
+        sys.exit(1)
 
-    targets_file = project_root / "data/targets.json"
+    data_dir = Path(os.path.expanduser(config.get('storage', {}).get('target_dir', '~/seestar_organizer/data')))
+    targets_file = data_dir / "targets.json"
+    
     local_targets = {}
     pre_size = 0
     if targets_file.exists():
         pre_size = targets_file.stat().st_size
         with open(targets_file, 'r') as f:
             data = json.load(f)
-            local_targets = {t['star_name']: t for t in data if isinstance(t, dict)}
+            local_targets = {t['star_name']: t for t in data if isinstance(t, dict) and 'star_name' in t}
         logger.info(f"📊 Pre-Pull: {len(local_targets)} stars | Size: {pre_size / 1024:.1f} KB")
 
-    # 2. The Stream Pull
     url = "https://targettool.aavso.org/TargetTool/api/v1/targets"
     logger.info("📡 Negotiating AAVSO handshake...")
     
@@ -81,26 +89,21 @@ def harvest():
                         stats["stable"] += 1
                         final_list.append(local_targets[name])
 
-            # 3. Final Landing & Size Audit
             with open(targets_file, "w") as f:
                 json.dump(final_list, f, indent=4)
             
             post_size = targets_file.stat().st_size
             growth = (post_size - pre_size) / 1024
             
-            logger.info(f"💾 Post-Write Audit:")
-            logger.info(f"   -> Final File Size: {post_size / 1024:.1f} KB (Delta: {growth:+.1f} KB)")
-            logger.info(f"   -> Total Database: {len(final_list)} targets")
+            logger.info(f"💾 Post-Write Audit: {post_size / 1024:.1f} KB. Total Database: {len(final_list)} targets")
             logger.info(f"✅ Pull Verified. {len(stats['updated'])} refreshed. {len(stats['new'])} added.")
-            
-            if stats["new"]:
-                logger.info(f"✨ New Target Confirmed: {stats['new']}")
-            
+            sys.exit(0)
         else:
             logger.error(f"❌ API Rejected request: {response.status_code}")
-
+            sys.exit(1)
     except Exception as e:
         logger.error(f"❌ Data Integrity Failure: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     harvest()

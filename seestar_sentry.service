@@ -1,16 +1,16 @@
-# Objective: Systemd service configuration for background autonomous operation.
 [Unit]
-Description=Seestar Organizer Sentry - Autonomous AAVSO Monitor
-After=network.target
+Description=Seestar Sentry Daemon (Kwetal v1.0)
+After=seestar_audit.service
+Requires=seestar_audit.service
 
 [Service]
+Type=simple
 User=ed
+Group=ed
 WorkingDirectory=/home/ed/seestar_organizer
-ExecStart=/home/ed/seestar_organizer/venv/bin/python3 main.py
+ExecStart=/usr/bin/python3 /home/ed/seestar_organizer/main.py
 Restart=always
-RestartSec=10
-StandardOutput=append:/home/ed/seestar_organizer/logs/sentry.log
-StandardError=append:/home/ed/seestar_organizer/logs/sentry.log
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

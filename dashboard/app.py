@@ -1,33 +1,39 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# PROJECT: Federation Fleet Command
+# MODULE:  Telemetry Orchestrator (Dashboard)
+# VERSION: 1.4.13 (Bommel Baseline)
+# OBJECTIVE: Real-time status aggregation for multi-unit Seestar deployment.
+# -----------------------------------------------------------------------------
 from flask import Flask, render_template
 import json, os
-from pathlib import Path
 
-PROJECT_ROOT = Path("~/seestar_organizer").expanduser()
-STATUS_PATH = Path("/dev/shm/env_status.json")
-PLAN_PATH = PROJECT_ROOT / "data/tonights_plan.json"
-QC_PATH = PROJECT_ROOT / "core/postflight/data/qc_report.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'))
 
-app = Flask(__name__)
+def get_telemetry():
+    """Aggregates local vitals and fleet state from RAM-disk."""
+    path = "/dev/shm/env_status.json"
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        "maidenhead": "JO22hj",
+        "williamina_led": "led-grey",
+        "annie_led": "led-grey",
+        "henrietta_led": "led-grey",
+        "gps_led": "led-red",
+        "pps_offset": "WAIT",
+        "fog_led": "led-grey",
+        "jd": "0000000.0000"
+    }
 
-@app.route("/")
+@app.route('/')
 def index():
-    try:
-        with open(STATUS_PATH, "r") as f: env = json.load(f)
-    except: env = {"maidenhead": "HUNTING", "targets": "OFFLINE", "targets_led": "led-red"}
+    return render_template('index.html', env=get_telemetry())
 
-    try:
-        with open(PLAN_PATH, "r") as f:
-            plan_data = json.load(f)
-            plan_list = plan_data if isinstance(plan_data, list) else plan_data.get('targets', [])
-    except: plan_list = []
-
-    try:
-        if QC_PATH.exists():
-            with open(QC_PATH, "r") as f: qc_list = json.load(f)[-10:]
-        else: qc_list = []
-    except: qc_list = []
-
-    return render_template("index.html", env=env, plan=plan_list, qc=qc_list)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5050, threaded=True)

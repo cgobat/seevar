@@ -46,7 +46,7 @@ def generate_morning_report():
         for r in passed[:8]:
             msg += f"• {r.get('target', 'Unknown')}: SNR {r.get('snr', 0.0)}\n"
     
-    msg += "\n🔭 _Federation Status: JO22hj Parked_"
+    msg += "\n🔭 _Federation Status: {} Parked".format(self.obs.get("maidenhead"))_"
     send_telegram(msg)
 
 if __name__ == "__main__":

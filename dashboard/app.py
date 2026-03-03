@@ -21,7 +21,7 @@ def get_telemetry():
         except:
             pass
     return {
-        "maidenhead": "JO22hj",
+        "maidenhead": obs.get("maidenhead"),
         "williamina_led": "led-grey",
         "annie_led": "led-grey",
         "henrietta_led": "led-grey",

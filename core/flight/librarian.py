@@ -1,37 +1,30 @@
 #!/usr/bin/env python3
-import json
+import json, os, sys
 from pathlib import Path
 
-TARGETS_FILE = Path("~/seestar_organizer/data/nightly_targets.json").expanduser()
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+TARGET_FILE = PROJECT_ROOT / "data" / "targets.json"
 
 class TargetLibrarian:
     def __init__(self):
-        self.queue = {} # Using a dict for easy de-duplication
+        self.queue = []
 
-    def add_target(self, name, ra, dec, origin):
-        """Merges targets and detects international priority."""
-        if name in self.queue:
-            # Multi-tagged!
-            self.queue[name]['tags'].append(f"[{origin}]")
-            self.queue[name]['priority'] = "CRITICAL"
-        else:
-            self.queue[name] = {
-                "name": name,
-                "ra": ra,
-                "dec": dec,
-                "tags": [f"[{origin}]"],
-                "priority": "NORMAL"
-            }
+    def inject_aavso(self):
+        """Re-injecting the French/International Alerts."""
+        self.queue.append({"name": "[FR] T CRB", "priority": "CRITICAL"})
+
+    def inject_knvws(self):
+        """The Dutch 'Programma' Stars."""
+        for s in ["SS Cyg", "U Gem", "Z Cam", "RR Lyr"]:
+            self.queue.append({"name": f"[NL] {s}", "priority": "NORMAL"})
 
     def save(self):
-        # Format for the ticker
-        formatted = []
-        for name, data in self.queue.items():
-            tag_str = "".join(data['tags'])
-            formatted.append({
-                "name": f"{tag_str} {name}",
-                "priority": data['priority']
-            })
-        with open(TARGETS_FILE, 'w') as f:
-            json.dump(formatted, f, indent=2)
-        return len(formatted)
+        with open(TARGET_FILE, 'w') as f:
+            json.dump(self.queue, f, indent=2)
+        return len(self.queue)
+
+if __name__ == "__main__":
+    lib = TargetLibrarian()
+    lib.inject_knvws()
+    lib.inject_aavso()
+    print(f"Librarian: {lib.save()} targets synced.")

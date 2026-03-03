@@ -1,37 +1,34 @@
 #!/usr/bin/env python3
-# Version: 2.1.7 (Zero-Hardcode Edition)
+# S30-PRO Federation Dashboard (v1.5.8 - REDA Branch)
 from flask import Flask, render_template, jsonify
+import sys, os
 from pathlib import Path
-import datetime, json, os, sys
 
-# Federation Pathing
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# Force the project root for the Vault and Templates
+PROJECT_ROOT = Path("/home/ed/seestar_organizer")
+TEMPLATE_DIR = PROJECT_ROOT / "core/dashboard/templates"
+
+sys.path.append(str(PROJECT_ROOT))
 from core.flight.vault_manager import VaultManager
 
-app = Flask(__name__)
+# Explicitly anchor the templates to the RAID/Project path
+app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
 vault = VaultManager()
+
+@app.route('/')
+def index():
+    # Final check: Is the UI actually there?
+    if not os.path.exists(os.path.join(str(TEMPLATE_DIR), "index.html")):
+        return "CRITICAL ERROR: RAID UI ASSETS MISSING", 500
+    return render_template('index.html')
 
 @app.route('/telemetry')
 def telemetry():
-    # Dynamic Maidenhead resolve
     obs = vault.get_observer_config()
-    mhead = obs.get("maidenhead", "SEARCHING")
-    
-    # Load targets for the ticker
-    target_file = Path("~/seestar_organizer/data/nightly_targets.json").expanduser()
-    target_names = []
-    if target_file.exists():
-        with open(target_file, 'r') as f:
-            targets = json.load(f)
-            target_names = [t['name'] for t in targets]
-
     return jsonify({
-        "maidenhead": mhead,
-        "jdate": round(2440587.5 + (datetime.datetime.now(datetime.timezone.utc).timestamp() / 86400), 4),
-        "target_names": target_names,
-        "target_count": len(target_names),
-        "raid_status": "green" if os.path.ismount("/mnt/raid1") else "red"
+        "maidenhead": obs.get("maidenhead", "JO22hj"),
+        "status": "EXTERNAL_BRIDGE_UP"
     })
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5050)
+    app.run(host='0.0.0.0', port=5050, debug=False)

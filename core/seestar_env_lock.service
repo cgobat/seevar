@@ -1,0 +1,16 @@
+[Unit]
+Description=Federation Environment Guardian (v1.5.4 - Final Stake)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ed
+WorkingDirectory=/home/ed/seestar_organizer
+# We use the system python to run the hunter, providing the absolute path to the script
+ExecStart=/usr/bin/python3 /home/ed/seestar_organizer/core/utils/env_vampire_hunter.py
+StandardOutput=append:/home/ed/seestar_organizer/logs/guardian_debug.log
+StandardError=append:/home/ed/seestar_organizer/logs/guardian_debug.log
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

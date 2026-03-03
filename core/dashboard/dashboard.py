@@ -1,27 +1,51 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Objective: Terminal User Interface (TUI) for real-time system monitoring.
+Filename: core/dashboard/dashboard.py
+Version: 2.0.0 (Wolle/Silicon Grade)
+Objective: Serves the 3-block swipeable dashboard on port 5050.
 """
-"""
-Filename: core/dashboard.py
-Usage: dashboard.refresh()
-Note: Optimized for 'screen' sessions to provide high-glanceability status.
-"""
-import os
+
+from flask import Flask, render_template, jsonify
+import json
+from pathlib import Path
 from datetime import datetime
 
-class Dashboard:
-    def __init__(self):
-        pass
+app = Flask(__name__)
+ROOT = Path(__file__).resolve().parents[2]
 
-    def refresh(self, status_data):
-        os.system('clear')
-        print("="*60)
-        print(f"🔭 S30-PRO | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("="*60)
-        # Dynamic status printing based on status_data dictionary
-        print(f"\n[ SYSTEM STATE ]: {status_data.get('state', 'UNKNOWN')}")
-        print(f"[ STORAGE ]: {status_data.get('storage', '??')}")
-        print(f"[ WEATHER ]: {status_data.get('weather', '??')}")
-        print("="*60)
+def get_jdate():
+    """Calculates current Julian Date for the header."""
+    now = datetime.utcnow()
+    # Simplified JDate calculation for the dashboard display
+    a = (14 - now.month) // 12
+    y = now.year + 4800 - a
+    m = now.month + 12 * a - 3
+    jd = now.day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
+    return round(jd + (now.hour - 12) / 24 + now.minute / 1440 + now.second / 86400, 4)
 
-dashboard = Dashboard()
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/telemetry')
+def telemetry():
+    """Aggregates the Pillars of Truth for the frontend."""
+    try:
+        with open(ROOT / "core/flight/data/system_state.json", 'r') as f:
+            state = json.load(f)
+        with open(ROOT / "core/flight/data/tonights_plan.json", 'r') as f:
+            plan = json.load(f)
+            
+        return jsonify({
+            "jdate": get_jdate(),
+            "maidenhead": "JO22ni", # To be replaced by observer_math.py logic
+            "state": state,
+            "plan_count": len(plan.get("targets", []))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    # Landed on port 5050 to avoid systemd interference
+    app.run(host='0.0.0.0', port=5050, debug=False)

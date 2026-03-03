@@ -1,0 +1,13 @@
+[Unit]
+Description=S30-PRO Federation Dashboard (v2.0 Silicon)
+After=network.target seestar.service
+
+[Service]
+User=ed
+WorkingDirectory=/home/ed/seestar_organizer
+ExecStart=/home/ed/seestar_organizer/ssc-3.13.5/bin/python3 core/dashboard/dashboard.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

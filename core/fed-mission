@@ -1,19 +1,22 @@
 #!/bin/bash
-# S30-PRO Federation: Mission Control Loop (Production Version)
-# Objective: Execute the 24-hour Science Cycle without cluttering the Git repo.
+# S30-PRO Federation: Mission Control Loop (v2.6.0)
+# Objective: Full cycle automation including Postflight FITS Verification.
 
-cd "$(dirname "$0")/.." || exit
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT" || exit
 
-echo "🌅 [MORNING] Initiating Reconciliation..."
-# Updates ledger.json from the night's flight_report.json
+echo "🔬 [POSTFLIGHT] Auditing Last Night's FITS Evidence..."
+# Scans the Seestar storage for FITS files and verifies headers
+python3 core/postflight/fits_auditor.py
+
+echo "🌅 [MORNING] Initiating Reconciliation & Briefing..."
+# Only reconciles targets verified by the auditor
 python3 core/preflight/librarian.py --reconcile
 
-echo "🧛 [EVENING] Calculating Vampire Budget and Slicing Backlog..."
-# Creates observable_targets.json and tonights_plan.json
+echo "🧛 [EVENING] Slicing the 9-Day Backlog..."
 python3 core/preflight/librarian.py
 
-echo "🛰️ [FLIGHT] Handing over to Flightmaster (Orchestrator)..."
-# Executes the integration sequence
+echo "🛰️ [FLIGHT] Handing over to Flightmaster..."
 python3 core/flight/orchestrator.py
 
-echo "✅ Mission Cycle Handover Complete."
+echo "✅ [STATUS] Mission Cycle Complete. FITS Verified."

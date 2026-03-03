@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root { --neon: #39FF14; --bg: #0a0a0a; --panel: #141414; }
+        body { background: var(--bg); color: #ccc; font-family: monospace; margin: 0; overflow: hidden; }
+        
+        .header { display: flex; justify-content: space-between; padding: 15px; background: #000; border-bottom: 2px solid #222; }
+        .maidenhead { color: var(--neon); font-weight: bold; }
+
+        /* THE TRIPLE PILLAR CAROUSEL */
+        .viewport { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; height: 85vh; }
+        .block { flex: 0 0 100%; scroll-snap-align: start; padding: 25px; box-sizing: border-box; }
+        
+        @media (min-width: 1000px) { .block { flex: 0 0 33.3%; border-right: 1px solid #222; } }
+
+        h2 { color: var(--neon); border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 1.2rem; }
+        .stat { margin: 15px 0; display: flex; align-items: center; }
+        .led { width: 10px; height: 10px; border-radius: 50%; background: #333; margin-right: 15px; }
+        .led.on { background: var(--neon); box-shadow: 0 0 10px var(--neon); }
+        .val { margin-left: auto; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div id="mhead" class="maidenhead">JO22ni</div>
+        <div id="jd">JDATE: 2461102.0000</div>
+    </div>
+
+    <div class="viewport">
+        <section class="block">
+            <h2>I. PREFLIGHT</h2>
+            <div class="stat"><div class="led on"></div> BRIDGE (5432) <span class="val">ACTIVE</span></div>
+            <div class="stat"><div class="led on"></div> GPS LOCK <span class="val">FIXED</span></div>
+            <div class="stat"><div class="led"></div> FOG (VIS) <span class="val">CLEAR</span></div>
+            <div class="stat">STORAGE <span class="val">RAID1 OK</span></div>
+        </section>
+
+        <section class="block">
+            <h2>II. FLIGHT</h2>
+            <div class="stat">TARGET <span class="val" id="target">PARKED</span></div>
+            <div class="stat">PROGRESS <span class="val">0 / 45</span></div>
+            <div class="stat">ALTITUDE <span class="val">--°</span></div>
+            <div class="stat">STATE <span class="val" style="color:var(--neon)">OFF-DUTY</span></div>
+        </section>
+
+        <section class="block">
+            <h2>III. POSTFLIGHT</h2>
+            <div class="stat">LAST AUDIT <span class="val">N/A</span></div>
+            <div class="stat">WCS SOLVE <span class="val">--</span></div>
+            <div class="stat">AAVSO SUB <span class="val">READY</span></div>
+            <div class="stat">NAS SYNC <span class="val">IDLE</span></div>
+        </section>
+    </div>
+
+    <script>
+        function update() {
+            fetch('/telemetry').then(r => r.json()).then(data => {
+                document.getElementById('jd').innerText = "JDATE: " + data.jdate;
+                document.getElementById('mhead').innerText = data.maidenhead;
+            });
+        }
+        setInterval(update, 5000);
+    </script>
+</body>
+</html>

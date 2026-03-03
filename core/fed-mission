@@ -1,0 +1,19 @@
+#!/bin/bash
+# S30-PRO Federation: Mission Control Loop (Production Version)
+# Objective: Execute the 24-hour Science Cycle without cluttering the Git repo.
+
+cd "$(dirname "$0")/.." || exit
+
+echo "🌅 [MORNING] Initiating Reconciliation..."
+# Updates ledger.json from the night's flight_report.json
+python3 core/preflight/librarian.py --reconcile
+
+echo "🧛 [EVENING] Calculating Vampire Budget and Slicing Backlog..."
+# Creates observable_targets.json and tonights_plan.json
+python3 core/preflight/librarian.py
+
+echo "🛰️ [FLIGHT] Handing over to Flightmaster (Orchestrator)..."
+# Executes the integration sequence
+python3 core/flight/orchestrator.py
+
+echo "✅ Mission Cycle Handover Complete."

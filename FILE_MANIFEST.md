@@ -1,15 +1,15 @@
 # 📑 Seestar Organizer: Purified Manifest
-**Audit Timestamp:** 2026-03-02 23:43:32
+**Audit Timestamp:** 2026-03-03 08:51:56
 
 ## 🗄️ RAID1 DATA REPOSITORY
 | Filename | Objective | Status/Count |
 | :--- | :--- | :--- |
 | `data/campaign_targets.json` | Data file | 409 Targets |
-| `data/ledger.json` | Error reading JSON metadata. | ERR Targets |
-| `data/observable_targets.json` | Error reading JSON metadata. | ERR Targets |
+| `data/ledger.json` | Master Observational Register and Status Ledger | N/A Targets |
+| `data/observable_targets.json` | The Menu: Astrophysical Reality Filter | 409 Targets |
 | `data/system_state.json` | Data file | N/A Targets |
-| `data/targets.json` | Error reading JSON metadata. | ERR Targets |
-| `data/tonights_plan.json` | Data file | 409 Targets |
+| `data/targets.json` | The Research Catalog: Immutable Master Target List | 409 Targets |
+| `data/tonights_plan.json` | The Flight Contract for 2026-03-03 | 45 Targets |
 
 ## 🛫 PREFLIGHT
 * `core/preflight/audit.py`: Enforces scientific cadence. Cross-references targets with ledger.json.
@@ -17,7 +17,7 @@
 * `core/preflight/gps.py`: Manages geographic coordinates using config.toml as the source of truth.
 * `core/preflight/harvester.py`: No script objective defined.
 * `core/preflight/horizon.py`: Veto targets based on local obstructions (Trees, Buildings) using Az/Alt mapping.
-* `core/preflight/librarian.py`: No script objective defined.
+* `core/preflight/librarian.py`: Manages the data pipeline from Master Catalog -> Observable Menu -> Flight Contract.
 * `core/preflight/target_evaluator.py`: Audits the nightly plan for freshness and quantity.
 * `core/preflight/weather.py`: Queries local weather APIs based on dynamic GPS data to enforce the maximum cloud cover safety gate.
 * `core/planning/nightly_planner.py`: Score 1,240 targets against tonights sky and pick the Top 20.
@@ -55,11 +55,13 @@
 * `utils/fix_imports.py`: Automated namespace correction utility for project-wide absolute import resolution.
 * `utils/generate_manifest.py`: Audits both Python scripts (via regex) and JSON data (via internal keys), then mirrors to NAS.
 * `utils/history_tracker.py`: Scans the Seestar observation storage to update last_observed timestamps in the campaign database.
+* `utils/init_ledger.py`: Initializes the master Ledger with proper headers and PENDING status.
 * `utils/inject_location.py`: Dynamically synchronizes Bridge/Simulator location using config.toml as the source of truth.
 * `utils/manifest_auditor.py`: Audits target lists against comparison charts to link active targets with canonical AUIDs and coordinates.
 * `utils/migrate_schema.py`: No script objective defined.
 * `utils/notifier.py`: Outbound notification manager that generates morning reports and sends mission summaries via Telegram.
 * `utils/platesolve_analyst.py`: Quantitative reporter for plate-solving success rates, performing blind solves to compare header coordinates against reality.
+* `utils/purify_catalog.py`: Wraps the raw 409-target list into a Federation-standard JSON with metadata.
 * `utils/quick_phot.py`: Lightweight instrumental photometry script for rapid magnitude estimation and zero-point offset calculation.
 * `utils/wvs_ingester.py`: Downloads and parses the KNVWS Werkgroep Veranderlijke Sterren program list to automate local campaign alignment.
 * `core/utils/chrony_monitor.py`: No script objective defined.

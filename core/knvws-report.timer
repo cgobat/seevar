@@ -1,0 +1,9 @@
+[Unit]
+Description=Monthly KNVWS Report Generation
+
+[Timer]
+OnCalendar=*-*-01 01:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

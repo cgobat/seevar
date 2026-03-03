@@ -1,0 +1,7 @@
+[Unit]
+Description=KNVWS Monthly Reporter (REDA Branch)
+
+[Service]
+Type=oneshot
+User=ed
+ExecStart=/home/ed/.pyenv/versions/ssc-3.13.5/bin/python3 /home/ed/seestar_organizer/core/postflight/knvws_reporter.py

@@ -1,13 +1,18 @@
 [Unit]
-Description=S30-PRO Federation Dashboard (v2.0 Silicon)
-After=network.target seestar.service
+Description=S30-PRO Federation Dashboard (v2.1.0 - Master Link)
+RequiresMountsFor=/mnt/raid1
+After=network-online.target seestar_env_lock.service mnt-raid1.mount
+Wants=network-online.target
 
 [Service]
 User=ed
+Group=ed
 WorkingDirectory=/home/ed/seestar_organizer
-ExecStart=/home/ed/seestar_organizer/ssc-3.13.5/bin/python3 core/dashboard/dashboard.py
+# The Master Link: Ensuring the script sees the whole project
+Environment=PYTHONPATH=/home/ed/seestar_organizer
+ExecStart=/home/ed/.pyenv/versions/ssc-3.13.5/bin/python3 /home/ed/seestar_organizer/core/dashboard/dashboard.py
 Restart=always
-RestartSec=10
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

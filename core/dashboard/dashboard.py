@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# S30-PRO Federation Dashboard (v2.2.1 - The 500 Killer)
-import json, os, sys
+# S30-PRO Federation Dashboard (v3.1.0 - Ledger Sync & Professional UI)
+import json, os, sys, time
 from flask import Flask, render_template, jsonify
 from pathlib import Path
 
-# Absolute Pathing to the core directories
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parents[1]
 TEMPLATE_DIR = BASE_DIR / "templates"
-DATA_FILE = PROJECT_ROOT / "data" / "targets.json"
+DATA_FILE = PROJECT_ROOT / "data" / "tonights_plan.json"
+STATE_FILE = PROJECT_ROOT / "data" / "system_state.json"
+LEDGER_FILE = PROJECT_ROOT / "data" / "ledger.json"
 
 sys.path.append(str(PROJECT_ROOT))
 from core.flight.vault_manager import VaultManager
@@ -19,28 +20,43 @@ vault = VaultManager()
 
 @app.route('/')
 def index():
-    # Safely load the RAID targets to pass to the frontend
     targets = []
     if DATA_FILE.exists():
         try:
             with open(DATA_FILE, 'r') as f:
-                targets = json.load(f)
-        except Exception as e:
-            print(f"JSON Error: {e}")
+                data = json.load(f)
+                targets = data.get("targets", [])
+        except: pass
             
-    # Fallback if the RAID is acting up
     if not targets:
-        targets = [{"name": "AWAITING MISSION", "priority": "NORMAL"}]
+        targets = [{"star_name": "AWAITING FLIGHT PLAN", "priority": False}]
 
-    # INJECT the data into the HTML (This kills the 500 error)
     return render_template('index.html', target_data=targets)
 
 @app.route('/telemetry')
 def telemetry():
     obs = vault.get_observer_config()
+    state_data = {"state": "PARKED", "sub": "OFF-DUTY", "msg": "Waiting for hardware..."}
+    
+    # Read Orchestrator State
+    if STATE_FILE.exists():
+        try:
+            with open(STATE_FILE, 'r') as f:
+                state_data.update(json.load(f))
+        except: pass
+
+    # Read Ledger 'Last Modified' Timestamp
+    audit_time = "NEVER"
+    if LEDGER_FILE.exists():
+        try:
+            mtime = os.path.getmtime(LEDGER_FILE)
+            audit_time = time.strftime('%H:%M:%S', time.localtime(mtime))
+        except: pass
+
     return jsonify({
         "maidenhead": obs.get("maidenhead", "JO22hj"),
-        "status": "EXTERNAL_BRIDGE_UP"
+        "orchestrator": state_data,
+        "last_audit": audit_time
     })
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S30-PRO Federation Dashboard</title>
     <style>
         :root {
@@ -12,34 +12,30 @@
             --led-grey: #555555; --led-bluegrey: #4a5a6a;
             --neon-purple: #E0B0FF; --purple-glow: #BF00FF;
         }
-        body { background-color: var(--bg-dark); color: var(--text-bright); font-family: 'Courier New', Courier, monospace; margin: 0; padding: 10px 20px; }
-        .top-bar { display: flex; justify-content: space-between; color: var(--led-green); font-weight: bold; font-size: 0.9em; margin-bottom: 20px; padding: 5px 0; border-bottom: 1px solid #333; }
-        .container { display: flex; gap: 20px; justify-content: space-between; }
-        .panel { flex: 1; background-color: var(--panel-bg); border: 1px solid #333; padding: 20px; min-height: 400px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
-        .panel h2 { color: var(--text-muted); font-size: 0.85em; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; margin-bottom: 25px; }
         
-        /* Flight Window specific styling */
-        .flight-window-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed #333; font-size: 0.9em; font-weight: bold; }
+        * { box-sizing: border-box; } 
+        
+        body { background-color: var(--bg-dark); color: var(--text-bright); font-family: 'Courier New', Courier, monospace; margin: 0; padding: 10px 20px; overflow-x: hidden; }
+        
+        .top-bar { display: flex; justify-content: space-between; color: var(--led-green); font-weight: bold; font-size: 0.9em; margin-bottom: 20px; padding: 5px 0; border-bottom: 1px solid #333; }
+        .swipe-hint { display: none; text-align: center; color: var(--led-orange); font-size: 0.8em; margin-bottom: 10px; font-weight: bold; }
+
+        .container { display: flex; gap: 20px; justify-content: space-between; width: 100%; }
+        .panel { flex: 1; background-color: var(--panel-bg); border: 1px solid #333; padding: 20px; min-height: 400px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .panel h2 { color: var(--text-muted); font-size: 0.85em; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; }
+        
+        .flight-window-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #333; font-size: 0.9em; font-weight: bold; }
         .fw-val { color: #88ccff; letter-spacing: 1px; }
 
-        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.85em; font-weight: bold; }
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.85em; font-weight: bold; }
         .label { color: var(--text-muted); width: 45%; }
         .val { color: var(--text-bright); text-align: left; flex: 1; }
-        .val-fetching { background-color: #224466; color: #88ccff; padding: 2px 5px; }
         
-        /* HARDWARE LEDS */
-        .led { 
-            width: 20px; /* Slightly wider to fit the numbers */
-            height: 20px; 
-            border-radius: 4px; 
-            margin-left: 10px; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px; 
-            font-weight: 900;
-            color: #000; /* Black text inside LED for contrast */
-        }
+        .target-card { border: 1px dashed #444; background: #151515; padding: 15px; margin-top: 15px; }
+        .target-card .row { margin-bottom: 8px; }
+        .target-card .label { width: 30%; color: #aaa; }
+        
+        .led { width: 20px; height: 20px; border-radius: 4px; margin-left: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #000; }
         .green { background-color: var(--led-green); box-shadow: 0 0 8px var(--led-green); }
         .orange { background-color: var(--led-orange); box-shadow: 0 0 8px var(--led-orange); }
         .blue-grey { background-color: var(--led-bluegrey); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); border: 1px solid #333; color: transparent; }
@@ -47,25 +43,44 @@
         
         /* Orchestrator Center Panel */
         .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80%; text-align: center; }
+        
+        /* Shrunk by 20% */
         .icon-p { 
-            background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; font-size: 3.5em; font-weight: bold; font-family: sans-serif; 
-            width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; border-radius: 20px; margin-bottom: 20px; 
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5); transition: all 0.5s ease;
+            background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; 
+            font-size: 3em; font-weight: bold; font-family: sans-serif; 
+            width: 80px; height: 80px; /* Was 100x100 */
+            display: flex; align-items: center; justify-content: center; 
+            border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); transition: all 0.5s ease; 
         }
         
         .state-parked { background: linear-gradient(135deg, #1e90ff, #005cbf) !important; animation: none; }
         .state-slewing { background: linear-gradient(135deg, #ff9900, #b36b00) !important; animation: spin 2s linear infinite; }
         .state-tracking { background: linear-gradient(135deg, #39ff14, #006600) !important; animation: pulse-green 3s infinite; }
-        .state-exposing { background: linear-gradient(135deg, #ff3333, #800000) !important; animation: pulse-red 1.5s infinite; }
+        
+        /* Toned down Slate-Blue for Exposing */
+        .state-exposing { background: linear-gradient(135deg, #5dade2, #1b4f72) !important; animation: pulse-blue 2s infinite; }
         
         .status-main { color: var(--text-bright); font-size: 2em; letter-spacing: 5px; font-weight: 900; margin-bottom: 10px; transition: color 0.5s ease;}
         .status-sub { color: var(--text-bright); font-size: 0.9em; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
         .status-msg { color: var(--text-muted); font-size: 0.8em; font-style: italic; }
 
         @keyframes pulse-green { 0% { box-shadow: 0 0 10px rgba(57,255,20,0.5); } 50% { box-shadow: 0 0 30px rgba(57,255,20,0.8); } 100% { box-shadow: 0 0 10px rgba(57,255,20,0.5); } }
-        @keyframes pulse-red { 0% { transform: scale(1); box-shadow: 0 0 15px rgba(255,51,51,0.5); } 50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(255,51,51,1); } 100% { transform: scale(1); box-shadow: 0 0 15px rgba(255,51,51,0.5); } }
+        @keyframes pulse-blue { 0% { transform: scale(1); box-shadow: 0 0 10px rgba(93,173,226,0.4); } 50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(93,173,226,0.8); } 100% { transform: scale(1); box-shadow: 0 0 10px rgba(93,173,226,0.4); } }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .critical { color: var(--neon-purple) !important; text-shadow: 0 0 8px var(--purple-glow), 0 0 12px var(--purple-glow); background: none !important; }
+
+        /* 🔥 FIXED MOBILE RESPONSIVE SWIPE CAROUSEL 🔥 */
+        @media (max-width: 900px) {
+            body { padding: 5px; }
+            .swipe-hint { display: block; }
+            .container { overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 20px; -webkit-overflow-scrolling: touch; gap: 10px; }
+            .panel { 
+                min-width: 93vw; /* Fills screen perfectly, leaves a tiny hint of the next panel */
+                scroll-snap-align: center; 
+                flex-shrink: 0; 
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -73,31 +88,34 @@
         <span id="telemetry-mh">JO22hj</span>
         <span>JDATE: <span id="live-jdate">CALCULATING...</span></span>
     </div>
+    <div class="swipe-hint">⟸ SWIPE PANELS ⟹</div>
 
     <div class="container">
         <div class="panel">
             <h2>SYSTEM VITALS</h2>
-            
-            <div class="flight-window-row">
-                <span class="label">FLIGHT WINDOW (ASTRO)</span> 
-                <span id="flight-window" class="fw-val">19:55 - 05:10</span> 
-            </div>
-
+            <div class="flight-window-row"><span class="label">FLIGHT WINDOW</span> <span class="fw-val">19:55 - 05:10</span></div>
             <div class="row"><span class="label">BRIDGE (5432)</span> <span class="val"></span> <div class="led green"></div></div>
             <div class="row"><span class="label">SEESTAR (LINK)</span> <span class="val">WAITING...</span> <div class="led orange"></div></div>
             <div class="row"><span class="label">GPS (LOCK)</span> <span class="val"></span> <div class="led green"></div></div>
             <div class="row"><span class="label">PPS SYNC</span> <span class="val">WAITING (-0.094ms)</span> <div class="led orange"></div></div>
             <div class="row"><span class="label">WEATHER (PRED)</span> <span class="val">CLEAR</span> <div class="led weather-icon">⭐</div></div>
-            <div class="row"><span class="label">STORAGE (HOME)</span> <span class="val">FEDERATION</span> <div class="led green"></div></div>
-            
-            <div class="row"><span class="label">TARGET LIST</span> <span id="t-ticker" class="val val-fetching">FETCHING...</span> <div id="target-count-led" class="led orange"></div></div>
-            
             <div class="row"><span class="label">FOG (VIS)</span> <span class="val">DISCONNECTED</span> <div class="led blue-grey"></div></div>
+            
+            <div class="target-card">
+                <div class="row" style="border-bottom: 1px solid #333; padding-bottom: 5px;">
+                    <span class="label" style="width: auto;">TARGET TELEMETRY</span>
+                    <div id="target-count-led" class="led orange">00</div>
+                </div>
+                <div class="row"><span class="label">NAME</span> <span id="t-name" class="val">FETCHING...</span></div>
+                <div class="row"><span class="label">TYPE</span> <span id="t-type" class="val">-</span></div>
+                <div class="row"><span class="label">LOC</span> <span id="t-loc" class="val" style="font-size: 0.9em;">-</span></div>
+                <div class="row"><span class="label">MAG</span> <span id="t-mag" class="val">-</span></div>
+            </div>
         </div>
 
         <div class="panel">
             <div class="center-content">
-                <div id="orch-icon" class="icon-p state-parked">🅿️</div>
+                <div id="orch-icon" class="icon-p state-parked">P</div>
                 <div id="orch-main" class="status-main" style="color: #1e90ff;">PARKED</div>
                 <div id="orch-sub" class="status-sub">OFF-DUTY</div>
                 <div id="orch-msg" class="status-msg">Waiting for hardware...</div>
@@ -106,7 +124,7 @@
 
         <div class="panel">
             <h2>POSTFLIGHT AUDIT</h2>
-            <div class="row"><span class="label">LAST AUDIT</span> <span class="val">N/A</span></div>
+            <div class="row"><span class="label">LAST AUDIT</span> <span class="val" id="audit-stamp">N/A</span></div>
             <div class="row"><span class="label">KNVWS REPORT</span> <span class="val" id="r-stamp">AWAITING LIGHT</span></div>
         </div>
     </div>
@@ -116,25 +134,31 @@
         let tickerIndex = 0;
 
         function updateTicker() {
-            const display = document.getElementById('t-ticker');
             const countLed = document.getElementById('target-count-led');
-
+            
             if (!targetData || targetData.length === 0) {
-                display.innerText = "EMPTY"; 
-                display.className = "val"; 
-                countLed.className = "led orange";
-                countLed.innerText = "0";
+                document.getElementById('t-name').innerText = "NO FLIGHT PLAN"; 
+                countLed.className = "led orange"; countLed.innerText = "00";
                 return;
             }
             
-            // Inject the total count directly into the LED
             countLed.className = "led green";
-            // Pad to 2 digits (e.g., "05")
             countLed.innerText = targetData.length.toString().padStart(2, '0');
 
-            const target = targetData[tickerIndex];
-            display.innerText = target.name;
-            display.className = (target.priority === "CRITICAL") ? "val critical" : "val";
+            const t = targetData[tickerIndex];
+            document.getElementById('t-name').innerText = t.star_name || "UNKNOWN";
+            document.getElementById('t-name').className = (t.priority) ? "val critical" : "val";
+            document.getElementById('t-type').innerText = t.var_type || "N/A";
+            
+            const ra = t.ra ? parseFloat(t.ra).toFixed(2) : "--";
+            const dec = t.dec ? parseFloat(t.dec).toFixed(2) : "--";
+            const con = t.constellation || "UNK";
+            document.getElementById('t-loc').innerText = `${con} | RA: ${ra} DEC: ${dec}`;
+            
+            const maxM = t.max_mag || "--";
+            const minM = t.min_mag || "--";
+            document.getElementById('t-mag').innerText = `${maxM} - ${minM} (V)`;
+            
             tickerIndex = (tickerIndex + 1) % targetData.length;
         }
 
@@ -143,7 +167,8 @@
                 .then(res => res.json())
                 .then(data => {
                     if(data.maidenhead) document.getElementById('telemetry-mh').innerText = data.maidenhead;
-                    
+                    if(data.last_audit) document.getElementById('audit-stamp').innerText = data.last_audit;
+
                     if(data.orchestrator) {
                         const state = data.orchestrator.state;
                         document.getElementById('orch-main').innerText = state;
@@ -154,13 +179,13 @@
                         const mainText = document.getElementById('orch-main');
                         
                         if(state === 'PARKED') {
-                            icon.innerText = '🅿️'; icon.className = 'icon-p state-parked'; mainText.style.color = '#1e90ff';
+                            icon.innerText = 'P'; icon.className = 'icon-p state-parked'; mainText.style.color = '#1e90ff';
                         } else if(state === 'SLEWING') {
-                            icon.innerText = '🔭'; icon.className = 'icon-p state-slewing'; mainText.style.color = '#ff9900';
+                            icon.innerText = 'S'; icon.className = 'icon-p state-slewing'; mainText.style.color = '#ff9900';
                         } else if(state === 'TRACKING') {
-                            icon.innerText = '🎯'; icon.className = 'icon-p state-tracking'; mainText.style.color = '#39ff14';
+                            icon.innerText = 'T'; icon.className = 'icon-p state-tracking'; mainText.style.color = '#39ff14';
                         } else if(state === 'EXPOSING') {
-                            icon.innerText = '📸'; icon.className = 'icon-p state-exposing'; mainText.style.color = '#ff3333';
+                            icon.innerText = 'E'; icon.className = 'icon-p state-exposing'; mainText.style.color = '#5dade2';
                         }
                     }
                 })
@@ -173,7 +198,7 @@
             document.getElementById('live-jdate').innerText = jd.toFixed(4);
         }
 
-        setInterval(updateTicker, 3000);
+        setInterval(updateTicker, 4000);
         setInterval(fetchTelemetry, 2000);
         setInterval(updateJDate, 1000);
         updateTicker(); fetchTelemetry(); updateJDate();

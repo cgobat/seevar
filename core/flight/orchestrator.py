@@ -2,18 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Objective: Single-Point Flight Master. 
-Logic: Safety -> Manifest Audit -> Sequencing -> Alpaca Injection.
-Path: ~/seestar_organizer/core/flight/orchestrator.py
-Version: 2.0.0 (Federation Standard)
+Logic: Safety -> Manifest Triage -> Atomic State Tracking -> Alpaca Injection.
+Version: 2.1.0 (Hardened Federation Standard)
 """
 
-import os
-import sys
-import json
-import time
-import requests
-import logging
-import socket
+import os, sys, json, time, requests, logging, socket, tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -24,44 +17,75 @@ class FlightMaster:
     def __init__(self):
         self.root = Path(__file__).resolve().parents[2]
         self.plan_path = self.root / "data/tonights_plan.json"
-        self.state_file = self.root / "core/flight/data/system_state.json"
-        self.bridge_url = "http://127.0.0.1:5432/0/schedule" # Alpaca Proxy Port
+        # Standardized state path for Dashboard visibility
+        self.state_file = self.root / "data/system_state.json"
+        self.bridge_url = "http://127.0.0.1:5432/0/schedule"
+
+    def _atomic_state(self, state, sub, msg):
+        """Atomic write pattern: prevents Dashboard read-collisions."""
+        data = {
+            "state": state, 
+            "sub": sub, 
+            "msg": msg, 
+            "updated": datetime.now().strftime('%H:%M:%S')
+        }
+        dir_name = self.state_file.parent
+        fd, temp_path = tempfile.mkstemp(dir=dir_name, suffix='.json')
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, self.state_file)
 
     def _check_safety(self):
-        """Absorbs preflight_check.py vitals."""
-        # Simple Bridge Check
+        self._atomic_state("PREFLIGHT", "BRIDGE_CHECK", "Pinging Alpaca Bridge...")
         try:
             with socket.create_connection(("127.0.0.1", 5432), timeout=1):
                 logger.info("📡 Alpaca Bridge: ONLINE")
                 return True
         except:
-            logger.error("❌ Alpaca Bridge: OFFLINE. Port 5432 unreachable.")
+            self._atomic_state("ERROR", "BRIDGE_OFFLINE", "Port 5432 unreachable.")
+            logger.error("❌ Alpaca Bridge: OFFLINE.")
             return False
 
-    def _audit_manifest(self):
-        """Verifies Librarian's stamps before flight."""
+    def _triage_manifest(self):
+        """The 'Reality Filter' logic: Solar and Horizon Veto."""
         if not self.plan_path.exists():
-            logger.error(f"❌ No plan found at {self.plan_path}")
-            return None
+            self._atomic_state("ERROR", "PLAN_MISSING", "tonights_plan.json not found.")
+            return []
 
         with open(self.plan_path, 'r') as f:
             plan = json.load(f)
 
-        header = plan.get("header", {})
-        today = datetime.now().strftime("%Y-%m-%d")
-        
-        if header.get("$date") != today:
-            logger.warning(f"⚠️ Plan Date Mismatch: Plan is {header.get('$date')}, Today is {today}")
-            # In a real mission, we might abort here. For now, we log it.
+        raw_targets = plan.get("targets", [])
+        approved = []
 
-        targets = plan.get("targets", [])
-        logger.info(f"📋 Manifest Verified: {len(targets)} targets for {today}.")
-        return targets
+        self._atomic_state("EVALUATING", "TRIAGE", f"Checking {len(raw_targets)} targets...")
+
+        for t in raw_targets:
+            name = t.get('star_name') or "Unknown"
+            
+            # 1. Solar Conjunction Veto (Hardware Safety)
+            if t.get("solar_conjunction") is True:
+                logger.warning(f"  ⏭️ Skipping {name}: Solar Conjunction")
+                continue
+            
+            # 2. Horizon Veto (Science Integrity)
+            obs = t.get("observability_times", "")
+            if isinstance(obs, str) and "not observable" in obs.lower():
+                logger.warning(f"  ⏭️ Skipping {name}: Below Horizon")
+                continue
+
+            approved.append(t)
+            
+        logger.info(f"🎯 Triage Complete: {len(approved)}/{len(raw_targets)} targets approved.")
+        return approved
 
     def inject_to_bridge(self, targets):
-        """Absorbs block_injector.py logic."""
-        logger.info("💉 Injecting science blocks to Seestar queue...")
-        # Clear existing schedule for a clean start
+        """Handover to the Alpaca Proxy schedule."""
+        self._atomic_state("SLEWING", "INJECTING", f"Dispatching {len(targets)} targets...")
+        
+        # Clear existing schedule
         try:
             requests.post(f"{self.bridge_url}/clear", timeout=2)
         except: pass
@@ -69,37 +93,32 @@ class FlightMaster:
         for t in targets:
             name = t.get('star_name') or t.get('name')
             try:
-                # Dispatch sequence: Startup -> Image -> Dark
+                # Sequence: Startup -> Image
                 requests.post(f"{self.bridge_url}/startup", data={"auto_focus":"on","dark_frames":"off"})
                 requests.post(f"{self.bridge_url}/image", data={
                     "targetName": name, 
-                    "ra": t['ra'], 
-                    "dec": t['dec'],
-                    "useJ2000": "on", 
-                    "panelTime": "240", 
-                    "gain": "80", 
-                    "action": "append"
+                    "ra": t['ra'], "dec": t['dec'],
+                    "useJ2000": "on", "panelTime": "240", 
+                    "gain": "80", "action": "append"
                 })
                 logger.info(f"  ✅ Dispatched: {name}")
             except Exception as e:
                 logger.error(f"  ❌ Failed to inject {name}: {e}")
 
-    def run_mission(self):
-        print("\n" + "="*50)
-        print("🚀 S30-PRO FEDERATION: FLIGHT MASTER STARTING")
-        print("="*50)
+        self._atomic_state("INTEGRATING", "ACTIVE", f"Tracking {len(targets)} targets.")
 
+    def run_mission(self):
+        logger.info("🚀 S30-PRO FEDERATION: FLIGHT MASTER STARTING")
         if not self._check_safety(): return
         
-        targets = self._audit_manifest()
-        if not targets: return
+        targets = self._triage_manifest()
+        if not targets: 
+            self._atomic_state("IDLE", "EMPTY_PLAN", "No observable targets.")
+            return
 
-        # Handover to bridge
         self.inject_to_bridge(targets)
-
-        print("\n" + "="*50)
-        print("🏁 FLIGHT MASTER: MISSION DISPATCHED")
-        print("="*50 + "\n")
+        logger.info("🏁 FLIGHT MASTER: MISSION HANDOVER COMPLETE")
 
 if __name__ == "__main__":
-    FlightMaster().run_mission()
+    fm = FlightMaster()
+    fm.run_mission()

@@ -2,28 +2,24 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/dashboard/dashboard.py
-Version: 4.1.0
-Objective: Flawless integration with caching to prevent UI flickering from Wi-Fi jitter.
+Version: 4.3.0
+Objective: Flawless integration with caching and Weather Emoticon.
 """
-
-import json, os, sys, time
-import requests
-import tomllib
+import json, os, sys, time, requests, tomllib
 from flask import Flask, render_template, jsonify
 from pathlib import Path
 
-# Paths
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 PLAN_FILE = DATA_DIR / "tonights_plan.json"
 STATE_FILE = DATA_DIR / "system_state.json"
 LEDGER_FILE = DATA_DIR / "ledger.json"
+WEATHER_FILE = DATA_DIR / "weather_state.json"
 
 sys.path.append(str(PROJECT_ROOT))
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
 
-# Anti-Flicker Cache
 HW_CACHE = {"timestamp": 0, "data": {"link_status": "OFFLINE", "battery": "N/A", "storage_mb": "N/A"}}
 
 def load_config(file_path):
@@ -39,30 +35,23 @@ def get_seestar_ip():
     alp_cfg = load_config("~/seestar_alp/device/config.toml")
     ip = alp_cfg.get("device", {}).get("ip")
     if ip: return ip
-    
     org_cfg = load_config("~/seestar_organizer/config.toml")
     ip = org_cfg.get("seestar", {}).get("ip")
     if ip: return ip
-    
     return None
 
 def get_location_data():
     org_cfg = load_config("~/seestar_organizer/config.toml")
     obs = org_cfg.get("observer", {})
     if "maidenhead" in obs: return obs["maidenhead"]
-    
     loc = org_cfg.get("location", {})
     if "maidenhead" in loc: return loc["maidenhead"]
-    
     return "NO-GPS-LOCK"
 
 def fetch_hardware_vitals():
     global HW_CACHE
-    # Return cached data if less than 5 seconds old
     if time.time() - HW_CACHE["timestamp"] < 5:
         return HW_CACHE["data"]
-
-    # 1. Alpaca Bridge
     try:
         payload = {"Action": "method_sync", "Parameters": '{"method":"get_device_state"}', "ClientID": "1", "ClientTransactionID": "1"}
         res = requests.put("http://127.0.0.1:5555/api/v1/telescope/1/action", data=payload, timeout=2.0)
@@ -75,8 +64,6 @@ def fetch_hardware_vitals():
                 HW_CACHE["timestamp"] = time.time()
                 return HW_CACHE["data"]
     except: pass
-
-    # 2. Dynamic Direct IP Fallback
     ip = get_seestar_ip()
     if ip:
         try:
@@ -87,7 +74,6 @@ def fetch_hardware_vitals():
                 HW_CACHE["timestamp"] = time.time()
                 return HW_CACHE["data"]
         except: pass
-
     HW_CACHE["data"] = {"link_status": "OFFLINE", "battery": "N/A", "storage_mb": "N/A"}
     HW_CACHE["timestamp"] = time.time()
     return HW_CACHE["data"]
@@ -112,6 +98,13 @@ def telemetry():
                 state.update(json.load(f))
         except: pass
 
+    weather = {"status": "FETCHING", "icon": "❓"}
+    if WEATHER_FILE.exists():
+        try:
+            with open(WEATHER_FILE, 'r') as f:
+                weather.update(json.load(f))
+        except: pass
+
     audit = "NEVER"
     if LEDGER_FILE.exists():
         audit = time.strftime('%H:%M:%S', time.localtime(os.path.getmtime(LEDGER_FILE)))
@@ -120,6 +113,7 @@ def telemetry():
         "maidenhead": get_location_data(),
         "orchestrator": state,
         "hardware": fetch_hardware_vitals(),
+        "weather": weather,
         "last_audit": audit
     })
 

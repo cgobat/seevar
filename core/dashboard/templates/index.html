@@ -177,6 +177,19 @@
                     if(data.maidenhead) document.getElementById('telemetry-mh').innerText = data.maidenhead;
                     if(data.last_audit) document.getElementById('audit-stamp').innerText = data.last_audit;
 
+                    // Weather UI Injection
+                    if(data.weather) {
+                        const rows = document.querySelectorAll('.row');
+                        rows.forEach(row => {
+                            if(row.innerText.includes('WEATHER (PRED)')) {
+                                row.querySelector('.val').innerText = data.weather.status;
+                                const led = row.querySelector('.led');
+                                led.innerText = data.weather.icon;
+                                led.style.color = '#fff'; // Reveal emoticon
+                            }
+                        });
+                    }
+
                     // 1. Process Orchestrator State
                     if(data.orchestrator) {
                         const state = data.orchestrator.state || 'PARKED';
@@ -197,7 +210,6 @@
                             icon.innerText = 'E'; icon.className = 'icon-p state-exposing'; mainText.style.color = '#5dade2';
                         }
 
-                        // Process the 5-Line Log Array (if provided by orchestrator)
                         if(data.orchestrator.flight_log && Array.isArray(data.orchestrator.flight_log)) {
                             let logHtml = '';
                             const logs = data.orchestrator.flight_log.slice(-5);
@@ -205,7 +217,6 @@
                                 const isLatest = (index === logs.length - 1) ? 'latest' : '';
                                 logHtml += `<div class="log-line ${isLatest}">${line}</div>`;
                             });
-                            // Fill remaining empty lines to keep height static
                             for(let i = logs.length; i < 5; i++) {
                                 logHtml += `<div class="log-line"></div>`;
                             }
@@ -213,14 +224,13 @@
                         }
                     }
 
-                    // 2. Process Hardware Telemetry (The Link & Bottom Bar)
+                    // 2. Process Hardware Telemetry
                     if(data.hardware) {
                         const linkVal = document.getElementById('tel-link-val');
                         const linkLed = document.getElementById('tel-link-led');
                         const battTxt = document.getElementById('bb-batt');
                         const storeTxt = document.getElementById('bb-store');
 
-                        // Update Native Link LED
                         if(data.hardware.link_status === "ACTIVE") {
                             linkVal.innerText = "NATIVE COMMS UP";
                             linkLed.className = "led green";
@@ -229,7 +239,6 @@
                             linkLed.className = "led red";
                         }
 
-                        // Update Battery & Storage
                         const batt = data.hardware.battery;
                         if (batt !== "N/A") {
                             battTxt.innerText = batt + "%";

@@ -2,58 +2,65 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/preflight/disk_usage_monitor.py
-Version: 1.0.1
-Objective: Monitor S30 internal storage via SMB mount and update system state.
+Version: 1.1.0
+Objective: Monitor S30 internal storage via SMB mount and update system state with Go/No-Go veto.
 """
 
 import shutil
 import json
-import os
+import logging
+import sys
 from pathlib import Path
 
-# Path to the S30 SMB mount as defined in the Seestar Organizer structure
-S30_MOUNT = Path(os.path.expanduser("~/seestar_organizer/s30_storage"))
-# System state location in the physical USB buffer
-STATE_FILE = Path("/mnt/usb_buffer/data/system_state.json")
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logger = logging.getLogger("DiskMonitor")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+S30_MOUNT = PROJECT_ROOT / "s30_storage"
+STATE_FILE = PROJECT_ROOT / "data" / "system_state.json"
 
 def check_storage():
-    print("💾 === S30 STORAGE MONITOR === 💾")
+    logger.info("💾 Checking S30 Internal Storage...")
     
     if not S30_MOUNT.exists():
-        print(f"❌ Error: S30 mount not found at {S30_MOUNT}")
-        return
+        logger.error(f"❌ Mount point missing: {S30_MOUNT}")
+        return False
 
-    # Get disk usage stats via shutil
-    stat = shutil.disk_usage(S30_MOUNT)
-    
-    total_gb = stat.total / (1024**3)
-    used_gb = stat.used / (1024**3)
-    free_gb = stat.free / (1024**3)
-    percent_used = (stat.used / stat.total) * 100
+    try:
+        stat = shutil.disk_usage(S30_MOUNT)
+        total_gb = stat.total / (1024**3)
+        free_gb = stat.free / (1024**3)
+        percent_used = (stat.used / stat.total) * 100
 
-    print(f"📊 Total: {total_gb:.1f} GB | Used: {used_gb:.1f} GB | Free: {free_gb:.1f} GB")
-    print(f"⚠️ Usage: {percent_used:.1f}%")
+        logger.info(f"📊 Storage: {percent_used:.1f}% used ({free_gb:.1f} GB free of {total_gb:.1f} GB)")
 
-    # Update system_state.json for the Dashboard
-    state = {}
-    if STATE_FILE.exists():
-        try:
+        # Update system_state.json
+        state = {}
+        if STATE_FILE.exists():
             with open(STATE_FILE, 'r') as f:
                 state = json.load(f)
-        except json.JSONDecodeError:
-            state = {}
+        
+        state["storage"] = {
+            "percent_used": round(percent_used, 2),
+            "free_gb": round(free_gb, 2),
+            "status": "NOMINAL" if percent_used < 90 else "CRITICAL"
+        }
 
-    state['storage'] = {
-        "total_gb": round(total_gb, 1),
-        "free_gb": round(free_gb, 1),
-        "percent": round(percent_used, 1),
-        "status": "CRITICAL" if percent_used > 90 else "OK"
-    }
+        with open(STATE_FILE, 'w') as f:
+            json.dump(state, f, indent=4)
 
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f, indent=4)
-    
-    print("✅ Dashboard state updated.")
+        # Veto Logic
+        if percent_used > 95.0:
+            logger.error("🛑 DISK SPACE CRITICAL: Delete old FITS files before proceeding.")
+            return False
+        
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Storage check failed: {e}")
+        return False
 
 if __name__ == "__main__":
-    check_storage()
+    if not check_storage():
+        sys.exit(1)

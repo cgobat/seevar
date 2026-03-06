@@ -58,4 +58,4 @@ For technical deep-dives into our networking, state-machine logic, and AAVSO han
 ---
 
 ## 🍷 Slotwoord van een Heer van Stand
-"Het is een hele zorg, nietwaar? De sterrenhemel is onmetelijk en de techniek staat voor niets... wij handelen hier volgens de regelen van het fatsoen!"
+"Het is een hele zorg, nietwaar? De sterrenhemel is onmetelijk en de techniek staat voor niets... !"

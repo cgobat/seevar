@@ -1,46 +1,92 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-#Objective: Enforces scientific cadence. Cross-references targets with ledger.json.
+Filename: core/preflight/audit.py
+Version: 1.2.0
+Objective: Enforces scientific cadence by cross-referencing the Federation catalog with ledger.json.
 """
+
 import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logger = logging.getLogger("CadenceAudit")
 
 def run_audit():
-    project_root = Path(__file__).parent.parent.parent
-    master_path = project_root / "data/targets.json"
-    ledger_path = project_root / "data/ledger.json" # Historical record
+    # Structural path resolution
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    CATALOG_PATH = PROJECT_ROOT / "catalogs" / "federation_catalog.json"
+    LEDGER_PATH = PROJECT_ROOT / "data" / "ledger.json"
 
-    if not master_path.exists():
-        print("[AUDIT] Master Catalog not found. Run Librarian first.")
+    if not CATALOG_PATH.exists():
+        logger.error(f"Federation Catalog missing at {CATALOG_PATH}. Run Librarian first.")
         return
 
-    # Create dummy ledger if missing to avoid failure
-    if not ledger_path.exists():
-        with open(ledger_path, 'w') as f:
-            json.dump([], f)
+    # Load Ledger (Historical Record)
+    ledger = []
+    if LEDGER_PATH.exists():
+        try:
+            with open(LEDGER_PATH, 'r') as f:
+                ledger = json.load(f)
+        except json.JSONDecodeError:
+            logger.warning("Ledger corrupted. Starting fresh.")
 
-    with open(master_path, 'r') as f:
-        master = json.load(f)
-    with open(ledger_path, 'r') as f:
-        ledger = json.load(f)
-
-    # CADENCE: Skip if observed in last 72 hours
-    threshold = datetime.now() - timedelta(hours=72)
+    # Load Catalog
+    with open(CATALOG_PATH, 'r') as f:
+        catalog_data = json.load(f)
     
-    # Track which targets have recent hits in the ledger
-    recent_stars = {entry['name'] for entry in ledger 
-                    if datetime.strptime(entry.get('date', '2000-01-01'), '%Y-%m-%d') > threshold}
+    targets = catalog_data.get("targets", [])
+    now = datetime.now()
 
-    for target in master:
+    # Define Cadence Windows
+    # Priority stars (High Delta-V) = 24h cadence
+    # Standard stars = 72h cadence
+    priority_threshold = now - timedelta(hours=23)
+    standard_threshold = now - timedelta(hours=71)
+
+    # Build lookup of last observation dates from ledger
+    last_obs_map = {}
+    for entry in ledger:
+        name = entry.get('name')
+        try:
+            obs_date = datetime.strptime(entry.get('date', '2000-01-01'), '%Y-%m-%d')
+            if name not in last_obs_map or obs_date > last_obs_map[name]:
+                last_obs_map[name] = obs_date
+        except ValueError:
+            continue
+
+    updated_count = 0
+    skipped_count = 0
+
+    for target in targets:
         name = target.get('name')
-        target['cadence_skip'] = name in recent_stars
+        is_priority = target.get('priority', False)
+        last_seen = last_obs_map.get(name)
 
-    with open(master_path, 'w') as f:
-        json.dump(master, f, indent=4)
+        # Logic: If it hasn't been seen, it's NOT a skip.
+        if not last_seen:
+            target['cadence_skip'] = False
+            continue
 
-    print(f"✅ Audit: Cadence filters applied to {len(master)} targets.")
+        # Check against appropriate threshold
+        limit = priority_threshold if is_priority else standard_threshold
+        
+        if last_seen > limit:
+            target['cadence_skip'] = True
+            skipped_count += 1
+        else:
+            target['cadence_skip'] = False
+            updated_count += 1
+
+    # Save standardized catalog back
+    with open(CATALOG_PATH, 'w') as f:
+        json.dump(catalog_data, f, indent=4)
+
+    logger.info(f"✅ Cadence Audit Complete. Ready: {updated_count} | Skipped: {skipped_count}")
 
 if __name__ == "__main__":
     run_audit()

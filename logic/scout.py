@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Filename: logic/scout.py
-Version: 1.1.0
+Version: 1.2.0
 Objective: Crawl local Bruno collection to extract commands and payloads for the PSV dictionary using absolute paths.
 """
 
 import os
 import re
 
-# Using absolute paths to prevent "FileNotFound" errors
+# Absolute path definitions
 BASE_DIR = os.path.expanduser("~/seestar_organizer")
 BRUNO_PATH = os.path.expanduser("~/seestar_alp/bruno/Seestar Alpaca API")
 PSV_PATH = os.path.join(BASE_DIR, "logic/seestar_dict.psv")

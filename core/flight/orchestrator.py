@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Objective: Single-Point Flight Master. 
-Logic: Safety -> Manifest Triage -> Atomic State Tracking -> Alpaca Injection.
-Version: 2.1.0 (Hardened Federation Standard)
+Filename: core/flight/orchestrator.py
+Version: 2.4.0
+Objective: Inject advanced hardware state (Dew Heater, Darks, LP Filter) alongside the target schedule.
 """
 
-import os, sys, json, time, requests, logging, socket, tempfile
+import os
+import sys
+import json
+import time
+import socket
+import tempfile
+import requests
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -17,19 +24,18 @@ class FlightMaster:
     def __init__(self):
         self.root = Path(__file__).resolve().parents[2]
         self.plan_path = self.root / "data/tonights_plan.json"
-        # Standardized state path for Dashboard visibility
         self.state_file = self.root / "data/system_state.json"
-        self.bridge_url = "http://127.0.0.1:5432/0/schedule"
+        
+        # Target the SSC Bridge's queue manager on Index 1
+        self.bridge_schedule_url = "http://127.0.0.1:5432/1/schedule"
 
     def _atomic_state(self, state, sub, msg):
-        """Atomic write pattern: prevents Dashboard read-collisions."""
         data = {
-            "state": state, 
-            "sub": sub, 
-            "msg": msg, 
+            "state": state, "sub": sub, "msg": msg, 
             "updated": datetime.now().strftime('%H:%M:%S')
         }
         dir_name = self.state_file.parent
+        dir_name.mkdir(parents=True, exist_ok=True)
         fd, temp_path = tempfile.mkstemp(dir=dir_name, suffix='.json')
         with os.fdopen(fd, 'w') as f:
             json.dump(data, f, indent=2)
@@ -38,85 +44,89 @@ class FlightMaster:
         os.replace(temp_path, self.state_file)
 
     def _check_safety(self):
-        self._atomic_state("PREFLIGHT", "BRIDGE_CHECK", "Pinging Alpaca Bridge...")
+        self._atomic_state("PREFLIGHT", "BRIDGE_CHECK", "Pinging SSC Bridge...")
         try:
             with socket.create_connection(("127.0.0.1", 5432), timeout=1):
-                logger.info("📡 Alpaca Bridge: ONLINE")
                 return True
-        except:
+        except Exception:
             self._atomic_state("ERROR", "BRIDGE_OFFLINE", "Port 5432 unreachable.")
-            logger.error("❌ Alpaca Bridge: OFFLINE.")
             return False
 
     def _triage_manifest(self):
-        """The 'Reality Filter' logic: Solar and Horizon Veto."""
         if not self.plan_path.exists():
-            self._atomic_state("ERROR", "PLAN_MISSING", "tonights_plan.json not found.")
             return []
-
         with open(self.plan_path, 'r') as f:
             plan = json.load(f)
 
-        raw_targets = plan.get("targets", [])
         approved = []
-
-        self._atomic_state("EVALUATING", "TRIAGE", f"Checking {len(raw_targets)} targets...")
-
-        for t in raw_targets:
-            name = t.get('star_name') or "Unknown"
-            
-            # 1. Solar Conjunction Veto (Hardware Safety)
-            if t.get("solar_conjunction") is True:
-                logger.warning(f"  ⏭️ Skipping {name}: Solar Conjunction")
+        for t in plan.get("targets", []):
+            if t.get("solar_conjunction") is True or "not observable" in t.get("observability_times", "").lower():
                 continue
-            
-            # 2. Horizon Veto (Science Integrity)
-            obs = t.get("observability_times", "")
-            if isinstance(obs, str) and "not observable" in obs.lower():
-                logger.warning(f"  ⏭️ Skipping {name}: Below Horizon")
-                continue
-
             approved.append(t)
-            
-        logger.info(f"🎯 Triage Complete: {len(approved)}/{len(raw_targets)} targets approved.")
         return approved
 
     def inject_to_bridge(self, targets):
-        """Handover to the Alpaca Proxy schedule."""
-        self._atomic_state("SLEWING", "INJECTING", f"Dispatching {len(targets)} targets...")
+        self._atomic_state("SLEWING", "INJECTING", f"Dispatching {len(targets)} targets to UI Queue...")
         
-        # Clear existing schedule
+        # 1. Clear existing bridge schedule
         try:
-            requests.post(f"{self.bridge_url}/clear", timeout=2)
+            requests.post(f"{self.bridge_schedule_url}/clear", timeout=5)
+            logger.info("🧹 Cleared old SSC schedule.")
         except: pass
 
+        # 2. Inject Startup Sequence (Darks enabled)
+        try:
+            requests.post(f"{self.bridge_schedule_url}/startup", data={"auto_focus": "on", "dark_frames": "on"}, timeout=5)
+            logger.info("⚙️ Injected Startup Sequence (Autofocus + Darks).")
+        except Exception as e:
+            logger.error(f"❌ Failed to inject startup: {e}")
+
+        # 3. Inject Dew Heater (Set to 50%)
+        try:
+            requests.post(f"{self.bridge_schedule_url}/dew-heater", data={"power": "50", "action": "append"}, timeout=5)
+            logger.info("🔥 Injected Dew Heater (50%).")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to inject Dew Heater: {e}")
+
+        # 4. Append Targets to Bridge Queue
         for t in targets:
-            name = t.get('star_name') or t.get('name')
+            name = t.get('star_name', 'Unknown')
+            # Map LP filter explicitly based on the target payload
+            lp_param = "on" if t.get('use_lp_filter') else "off"
+            
+            payload = {
+                "targetName": name, 
+                "ra": t.get('ra'), 
+                "dec": t.get('dec'),
+                "useJ2000": "on", 
+                "panelTime": str(t.get('exposure_time_sec', 60)), 
+                "gain": str(t.get('gain', 80)), 
+                "useLPFilter": lp_param,
+                "action": "append"
+            }
             try:
-                # Sequence: Startup -> Image
-                requests.post(f"{self.bridge_url}/startup", data={"auto_focus":"on","dark_frames":"off"})
-                requests.post(f"{self.bridge_url}/image", data={
-                    "targetName": name, 
-                    "ra": t['ra'], "dec": t['dec'],
-                    "useJ2000": "on", "panelTime": "240", 
-                    "gain": "80", "action": "append"
-                })
-                logger.info(f"  ✅ Dispatched: {name}")
+                res = requests.post(f"{self.bridge_schedule_url}/image", data=payload, timeout=5)
+                if res.status_code == 200:
+                    logger.info(f"✅ Appended to UI Queue: {name} (LP: {lp_param})")
+                else:
+                    logger.error(f"❌ UI Queue rejected {name}: {res.status_code}")
             except Exception as e:
-                logger.error(f"  ❌ Failed to inject {name}: {e}")
+                logger.error(f"❌ Failed to append {name}: {e}")
+
+        # 5. Inject Park Sequence
+        try:
+            requests.post(f"{self.bridge_schedule_url}/park", data={"action": "append"}, timeout=5)
+            logger.info("🅿️ Injected Park Sequence.")
+        except Exception as e:
+            logger.error(f"❌ Failed to inject park: {e}")
 
         self._atomic_state("INTEGRATING", "ACTIVE", f"Tracking {len(targets)} targets.")
 
     def run_mission(self):
         logger.info("🚀 S30-PRO FEDERATION: FLIGHT MASTER STARTING")
         if not self._check_safety(): return
-        
         targets = self._triage_manifest()
-        if not targets: 
-            self._atomic_state("IDLE", "EMPTY_PLAN", "No observable targets.")
-            return
-
-        self.inject_to_bridge(targets)
+        if targets: self.inject_to_bridge(targets)
         logger.info("🏁 FLIGHT MASTER: MISSION HANDOVER COMPLETE")
 
 if __name__ == "__main__":

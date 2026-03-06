@@ -11,16 +11,17 @@
             --led-green: #39ff14; --led-orange: #ff9900; 
             --led-grey: #555555; --led-bluegrey: #4a5a6a;
             --neon-purple: #E0B0FF; --purple-glow: #BF00FF;
+            --alert-red: #ff3333;
         }
         
         * { box-sizing: border-box; } 
         
-        body { background-color: var(--bg-dark); color: var(--text-bright); font-family: 'Courier New', Courier, monospace; margin: 0; padding: 10px 20px; overflow-x: hidden; }
+        body { background-color: var(--bg-dark); color: var(--text-bright); font-family: 'Courier New', Courier, monospace; margin: 0; padding: 10px 20px; overflow-x: hidden; display: flex; flex-direction: column; min-height: 98vh;}
         
         .top-bar { display: flex; justify-content: space-between; color: var(--led-green); font-weight: bold; font-size: 0.9em; margin-bottom: 20px; padding: 5px 0; border-bottom: 1px solid #333; }
         .swipe-hint { display: none; text-align: center; color: var(--led-orange); font-size: 0.8em; margin-bottom: 10px; font-weight: bold; }
 
-        .container { display: flex; gap: 20px; justify-content: space-between; width: 100%; }
+        .container { display: flex; gap: 20px; justify-content: space-between; width: 100%; flex: 1;}
         .panel { flex: 1; background-color: var(--panel-bg); border: 1px solid #333; padding: 20px; min-height: 400px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
         .panel h2 { color: var(--text-muted); font-size: 0.85em; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; }
         
@@ -38,26 +39,16 @@
         .led { width: 20px; height: 20px; border-radius: 4px; margin-left: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #000; }
         .green { background-color: var(--led-green); box-shadow: 0 0 8px var(--led-green); }
         .orange { background-color: var(--led-orange); box-shadow: 0 0 8px var(--led-orange); }
+        .red { background-color: var(--alert-red); box-shadow: 0 0 8px var(--alert-red); }
+        .grey { background-color: var(--led-grey); }
         .blue-grey { background-color: var(--led-bluegrey); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); border: 1px solid #333; color: transparent; }
         .weather-icon { background: none; box-shadow: none; font-size: 18px; color: transparent; }
         
-        /* Orchestrator Center Panel */
         .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80%; text-align: center; }
-        
-        /* Shrunk by 20% */
-        .icon-p { 
-            background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; 
-            font-size: 3em; font-weight: bold; font-family: sans-serif; 
-            width: 80px; height: 80px; /* Was 100x100 */
-            display: flex; align-items: center; justify-content: center; 
-            border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); transition: all 0.5s ease; 
-        }
-        
+        .icon-p { background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; font-size: 3em; font-weight: bold; font-family: sans-serif; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); transition: all 0.5s ease; }
         .state-parked { background: linear-gradient(135deg, #1e90ff, #005cbf) !important; animation: none; }
         .state-slewing { background: linear-gradient(135deg, #ff9900, #b36b00) !important; animation: spin 2s linear infinite; }
         .state-tracking { background: linear-gradient(135deg, #39ff14, #006600) !important; animation: pulse-green 3s infinite; }
-        
-        /* Toned down Slate-Blue for Exposing */
         .state-exposing { background: linear-gradient(135deg, #5dade2, #1b4f72) !important; animation: pulse-blue 2s infinite; }
         
         .status-main { color: var(--text-bright); font-size: 2em; letter-spacing: 5px; font-weight: 900; margin-bottom: 10px; transition: color 0.5s ease;}
@@ -69,17 +60,27 @@
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .critical { color: var(--neon-purple) !important; text-shadow: 0 0 8px var(--purple-glow), 0 0 12px var(--purple-glow); background: none !important; }
 
-        /* 🔥 FIXED MOBILE RESPONSIVE SWIPE CAROUSEL 🔥 */
+        /* 🔥 BOTTOM BAR STYLES 🔥 */
+        .bottom-bar { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #333; padding-top: 15px; margin-top: 20px; font-size: 0.85em; }
+        .hw-stats { display: flex; flex-direction: column; gap: 8px; font-weight: bold; width: 250px;}
+        .stat-line { display: flex; align-items: center; }
+        .stat-label { color: var(--text-muted); width: 80px; }
+        .stat-val { color: var(--led-green); }
+        .batt-warn { color: var(--led-orange) !important; }
+        .batt-crit { color: var(--alert-red) !important; animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        .flight-log-container { flex: 1; display: flex; flex-direction: column; gap: 4px; border-left: 1px dashed #333; padding-left: 20px; margin-left: 20px; height: 80px; overflow: hidden; justify-content: flex-end;}
+        .log-line { color: var(--text-muted); font-size: 0.9em; white-space: nowrap; }
+        .log-line.latest { color: var(--text-bright); font-weight: bold; }
+
         @media (max-width: 900px) {
             body { padding: 5px; }
             .swipe-hint { display: block; }
             .container { overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 20px; -webkit-overflow-scrolling: touch; gap: 10px; }
-            .panel { 
-                min-width: 93vw; /* Fills screen perfectly, leaves a tiny hint of the next panel */
-                scroll-snap-align: center; 
-                flex-shrink: 0; 
-                padding: 15px;
-            }
+            .panel { min-width: 93vw; scroll-snap-align: center; flex-shrink: 0; padding: 15px; }
+            .bottom-bar { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .flight-log-container { border-left: none; border-top: 1px dashed #333; padding-left: 0; margin-left: 0; padding-top: 10px; width: 100%; height: auto;}
         }
     </style>
 </head>
@@ -95,9 +96,8 @@
             <h2>SYSTEM VITALS</h2>
             <div class="flight-window-row"><span class="label">FLIGHT WINDOW</span> <span class="fw-val">19:55 - 05:10</span></div>
             <div class="row"><span class="label">BRIDGE (5432)</span> <span class="val"></span> <div class="led green"></div></div>
-            <div class="row"><span class="label">SEESTAR (LINK)</span> <span class="val">WAITING...</span> <div class="led orange"></div></div>
+            <div class="row"><span class="label">SEESTAR (LINK)</span> <span id="tel-link-val" class="val">WAITING...</span> <div id="tel-link-led" class="led grey"></div></div>
             <div class="row"><span class="label">GPS (LOCK)</span> <span class="val"></span> <div class="led green"></div></div>
-            <div class="row"><span class="label">PPS SYNC</span> <span class="val">WAITING (-0.094ms)</span> <div class="led orange"></div></div>
             <div class="row"><span class="label">WEATHER (PRED)</span> <span class="val">CLEAR</span> <div class="led weather-icon">⭐</div></div>
             <div class="row"><span class="label">FOG (VIS)</span> <span class="val">DISCONNECTED</span> <div class="led blue-grey"></div></div>
             
@@ -118,7 +118,7 @@
                 <div id="orch-icon" class="icon-p state-parked">P</div>
                 <div id="orch-main" class="status-main" style="color: #1e90ff;">PARKED</div>
                 <div id="orch-sub" class="status-sub">OFF-DUTY</div>
-                <div id="orch-msg" class="status-msg">Waiting for hardware...</div>
+                <div id="orch-msg" class="status-msg">Waiting for orchestrator...</div>
             </div>
         </div>
 
@@ -129,36 +129,44 @@
         </div>
     </div>
 
+    <div class="bottom-bar">
+        <div class="hw-stats">
+            <div class="stat-line"><span class="stat-label">🔋 BATT</span> <span id="bb-batt" class="stat-val">--%</span></div>
+            <div class="stat-line"><span class="stat-label">💾 STOR</span> <span id="bb-store" class="stat-val">-- MB</span></div>
+        </div>
+        <div class="flight-log-container" id="flight-log">
+            <div class="log-line latest">⏳ Hardware link established. Awaiting flight directives...</div>
+            <div class="log-line"></div>
+            <div class="log-line"></div>
+            <div class="log-line"></div>
+            <div class="log-line"></div>
+        </div>
+    </div>
+
     <script>
         const targetData = {{ target_data | tojson | safe }};
         let tickerIndex = 0;
 
         function updateTicker() {
             const countLed = document.getElementById('target-count-led');
-            
             if (!targetData || targetData.length === 0) {
                 document.getElementById('t-name').innerText = "NO FLIGHT PLAN"; 
                 countLed.className = "led orange"; countLed.innerText = "00";
                 return;
             }
-            
             countLed.className = "led green";
             countLed.innerText = targetData.length.toString().padStart(2, '0');
-
             const t = targetData[tickerIndex];
             document.getElementById('t-name').innerText = t.star_name || "UNKNOWN";
             document.getElementById('t-name').className = (t.priority) ? "val critical" : "val";
             document.getElementById('t-type').innerText = t.var_type || "N/A";
-            
             const ra = t.ra ? parseFloat(t.ra).toFixed(2) : "--";
             const dec = t.dec ? parseFloat(t.dec).toFixed(2) : "--";
             const con = t.constellation || "UNK";
             document.getElementById('t-loc').innerText = `${con} | RA: ${ra} DEC: ${dec}`;
-            
             const maxM = t.max_mag || "--";
             const minM = t.min_mag || "--";
             document.getElementById('t-mag').innerText = `${maxM} - ${minM} (V)`;
-            
             tickerIndex = (tickerIndex + 1) % targetData.length;
         }
 
@@ -169,11 +177,12 @@
                     if(data.maidenhead) document.getElementById('telemetry-mh').innerText = data.maidenhead;
                     if(data.last_audit) document.getElementById('audit-stamp').innerText = data.last_audit;
 
+                    // 1. Process Orchestrator State
                     if(data.orchestrator) {
-                        const state = data.orchestrator.state;
+                        const state = data.orchestrator.state || 'PARKED';
                         document.getElementById('orch-main').innerText = state;
-                        document.getElementById('orch-sub').innerText = data.orchestrator.sub;
-                        document.getElementById('orch-msg').innerText = data.orchestrator.msg;
+                        document.getElementById('orch-sub').innerText = data.orchestrator.sub || 'OFF-DUTY';
+                        document.getElementById('orch-msg').innerText = data.orchestrator.msg || '';
                         
                         const icon = document.getElementById('orch-icon');
                         const mainText = document.getElementById('orch-main');
@@ -187,6 +196,52 @@
                         } else if(state === 'EXPOSING') {
                             icon.innerText = 'E'; icon.className = 'icon-p state-exposing'; mainText.style.color = '#5dade2';
                         }
+
+                        // Process the 5-Line Log Array (if provided by orchestrator)
+                        if(data.orchestrator.flight_log && Array.isArray(data.orchestrator.flight_log)) {
+                            let logHtml = '';
+                            const logs = data.orchestrator.flight_log.slice(-5);
+                            logs.forEach((line, index) => {
+                                const isLatest = (index === logs.length - 1) ? 'latest' : '';
+                                logHtml += `<div class="log-line ${isLatest}">${line}</div>`;
+                            });
+                            // Fill remaining empty lines to keep height static
+                            for(let i = logs.length; i < 5; i++) {
+                                logHtml += `<div class="log-line"></div>`;
+                            }
+                            document.getElementById('flight-log').innerHTML = logHtml;
+                        }
+                    }
+
+                    // 2. Process Hardware Telemetry (The Link & Bottom Bar)
+                    if(data.hardware) {
+                        const linkVal = document.getElementById('tel-link-val');
+                        const linkLed = document.getElementById('tel-link-led');
+                        const battTxt = document.getElementById('bb-batt');
+                        const storeTxt = document.getElementById('bb-store');
+
+                        // Update Native Link LED
+                        if(data.hardware.link_status === "ACTIVE") {
+                            linkVal.innerText = "NATIVE COMMS UP";
+                            linkLed.className = "led green";
+                        } else {
+                            linkVal.innerText = "NO SIGNAL";
+                            linkLed.className = "led red";
+                        }
+
+                        // Update Battery & Storage
+                        const batt = data.hardware.battery;
+                        if (batt !== "N/A") {
+                            battTxt.innerText = batt + "%";
+                            if (parseInt(batt) > 30) battTxt.className = "stat-val";
+                            else if (parseInt(batt) > 15) battTxt.className = "stat-val batt-warn";
+                            else battTxt.className = "stat-val batt-crit";
+                        } else {
+                            battTxt.innerText = "--%";
+                            battTxt.className = "stat-val batt-crit";
+                        }
+
+                        storeTxt.innerText = (data.hardware.storage_mb !== "N/A") ? data.hardware.storage_mb + " MB" : "-- MB";
                     }
                 })
                 .catch(err => console.error("Telemetry error:", err));

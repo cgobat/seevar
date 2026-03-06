@@ -1,11 +1,13 @@
 # 📑 Seestar Organizer: Purified Manifest
-**Audit Timestamp:** 2026-03-03 17:21:52
+**Audit Timestamp:** 2026-03-05 09:19:58
 
 ## 🗄️ RAID1 DATA REPOSITORY
 | Filename | Objective | Status/Count |
 | :--- | :--- | :--- |
 | `data/campaign_targets.json` | Data file | 409 Targets |
+| `data/horizon_mask.json` | Data file | N/A Targets |
 | `data/ledger.json` | Master Observational Register and Status Ledger | N/A Targets |
+| `data/local_horizon.json` | Error reading JSON metadata. | ERR Targets |
 | `data/observable_targets.json` | The Menu: Astrophysical Reality Filter | 409 Targets |
 | `data/system_state.json` | Data file | N/A Targets |
 | `data/targets.json` | Error reading JSON metadata. | ERR Targets |
@@ -30,6 +32,7 @@
 * `core/flight/librarian.py`: No script objective defined.
 * `core/flight/librarian_check.py`: No script objective defined.
 * `core/flight/orchestrator.py`: Single-Point Flight Master.
+* `core/flight/reboot.py`: Issue a hard reboot to a Seestar, monitor network state, and verify API readiness.
 * `core/flight/vault_manager.py`: Manages secure access to observational metadata and synchronizes GPS coordinates with config.toml.
 
 ## 🧪 POSTFLIGHT

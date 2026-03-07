@@ -1,24 +1,22 @@
-# 📡 AAVSO VSP API PROTOCOL
+# 📡 SEESTAR S30-PRO HARDWARE PROTOCOL
 
-> **Objective:** Defines connection strings, required parameters, and mandatory throttling logic for AAVSO API interactions.
-> **Version:** 1.2.0 (Garmt)
+> **Objective:** Definitive ZWO JSON-RPC method mapping.
+> **Version:** 2.0.0
 
-## 🔗 The Connection String
-- **Canonical URL**: `https://app.aavso.org/vsp/api/chart/`
-- **Method**: `GET`
-- **Auth**: HTTP Basic Auth
-  - **Username**: Your `AAVSO_TARGET_KEY`
-  - **Password**: String literal `api_token`
+## 🛠️ Core Methods (via Alpaca Action)
 
-## 🛠️ Required Parameters
-| Parameter | Value | Purpose |
-| :--- | :--- | :--- |
-| `star` | Name (e.g. "CH Cyg") | Target lookup |
-| `format` | `json` | Machine readable output |
-| `fov` | `60` | Field of View in arcminutes |
-| `maglimit` | `18.0` | Limiting magnitude for comp stars |
+### Camera Control
+- `start_exposure`: `["light", false]` -> Triggers single frame.
+- `set_setting`: `{"exp_ms": {"stack_l": ms}}` -> Sets exposure time.
+- `set_control_value`: `["gain", 80]` -> Sets sensor gain.
+- `iscope_stop_view`: Aborts all current camera actions.
 
-## ⚠️ Known Hazards
-- **Caching**: Python `__pycache__` can hide URL changes. Always clear cache when modifying `aavso_client.py`.
-- **400 Errors**: Usually indicate missing Auth headers or incorrect `app` subdomain.
-- **Pi-Sleep**: A 188.4s delay is mandatory between successful fetches to prevent IP throttling.
+### Navigation & Mount
+- `scope_goto`: `[ra, dec]` -> Slew to coordinates.
+- `start_solve`: Triggers plate solving/centering.
+- `get_solve_result`: Poll for `code: 0` (Success).
+- `scope_set_track_state`: `{"tracking": true}` -> Toggle sidereal tracking.
+
+## ⚠️ Port Architecture
+- **Port 5555**: Control Port (Alpaca / JSON-RPC). **Use this for everything.**
+- **Port 4720**: Video Stream (Preview only). **Ignore for Science.**

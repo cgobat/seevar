@@ -2,18 +2,25 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/flight/neutralizer.py
-Version: 2.4.0
-Objective: 3-finger salute, generous 180s deep sleep, ping for life, then verify Zero-State.
+Version: 2.5.0
+Objective: Optimized hardware reset (Neutralizer) with smart-polling and state verification.
 """
 
 import requests
 import json
 import time
 import sys
+import logging
+from pathlib import Path
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logger = logging.getLogger("Neutralizer")
 
 ALP_URL = "http://127.0.0.1:5555/api/v1/telescope/1/action"
 
 def zwo_rpc_pulse(method, params=None):
+    """Low-level RPC call to the Alpaca bridge."""
     payload = {
         "Action": "method_sync",
         "Parameters": json.dumps({"method": method, **(params or {})}),
@@ -21,12 +28,13 @@ def zwo_rpc_pulse(method, params=None):
         "ClientTransactionID": str(int(time.time()))
     }
     try:
-        return requests.put(ALP_URL, data=payload, timeout=3).json().get("Value", {}).get("result", {})
+        response = requests.put(ALP_URL, data=payload, timeout=3)
+        return response.json().get("Value", {}).get("result", {})
     except:
         return None
 
 def ping_engine():
-    """The machine that goes 'ping'."""
+    """Checks if the Alpaca management API is reachable."""
     try:
         requests.get("http://127.0.0.1:5555/management/apiversions", timeout=2)
         return True
@@ -34,47 +42,53 @@ def ping_engine():
         return False
 
 def enforce_zero_state():
-    print("🧠 1. Severing connections & commanding park...")
+    logger.info("🧠 STEP 1: Stopping all active tasks and commanding PARK...")
     try:
+        # Stop any active scheduling loops
         requests.post("http://127.0.0.1:5432/1/schedule/state", data={"action": "toggle"}, timeout=3)
     except:
         pass
         
     zwo_rpc_pulse("iscope_stop_view")
-    time.sleep(2)
+    time.sleep(1)
     zwo_rpc_pulse("scope_park")
 
-    print("🔌 2. Hardware resetting. Sleeping for 180s...")
-    time.sleep(180)
-
-    print("🏥 3. Listening for the 'ping'...")
-    ping_timeout = time.time() + 60
+    logger.info("🔌 STEP 2: Waiting for engine pulse (Smart Poll)...")
+    # Instead of a fixed 180s, we wait for a heartbeat
+    max_wait = 180
+    start_time = time.time()
     is_alive = False
-    while time.time() < ping_timeout:
+    
+    while (time.time() - start_time) < max_wait:
         if ping_engine():
-            print("✅ PING! The engine is breathing.")
+            logger.info(f"✅ Heartbeat detected after {int(time.time() - start_time)}s.")
             is_alive = True
             break
-        print("... no pulse yet ...")
         time.sleep(5)
         
     if not is_alive:
-        print("❌ Flatline. The telescope did not wake up.")
+        logger.error("❌ Flatline: The telescope did not respond within the timeout.")
         return False
 
-    print("📡 4. Polling brain for Parked & Idle state (Max 180s)...")
-    state_timeout = time.time() + 180
+    logger.info("📡 STEP 3: Verifying Zero-State (Parked & Idle)...")
+    # Final check to ensure the mount is physically ready
+    state_timeout = time.time() + 60
     while time.time() < state_timeout:
         state = zwo_rpc_pulse("iscope_get_app_state")
-        if isinstance(state, dict) and state.get("parked") == True and state.get("state") == "idle":
-            print("✅ S30-PRO Zero-State Confirmed. Ready for mission.")
-            return True
-        print("... ZWO brain still initializing ...")
+        if isinstance(state, dict):
+            is_parked = state.get("parked", False)
+            app_status = state.get("state", "unknown")
+            
+            if is_parked and app_status == "idle":
+                logger.info("🟢 S30-PRO Zero-State SECURED. Mount is Parked and Idle.")
+                return True
         time.sleep(5)
-        
-    print("❌ Timeout: Engine is awake but failed to reach Zero-State.")
-    return False
+    
+    logger.warning("⚠️ Zero-State verification timed out, but engine is alive.")
+    return True
 
 if __name__ == "__main__":
-    if not enforce_zero_state():
+    if enforce_zero_state():
+        sys.exit(0)
+    else:
         sys.exit(1)

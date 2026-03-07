@@ -2,61 +2,68 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/flight/mount_control.py
-Version: 1.4.3
-Objective: Secure mount orientation by parsing nested JSON-RPC responses from the Alpaca bridge.
+Version: 1.5.0
+Objective: Centralized mount controller for coordinate retrieval and target acquisition.
 """
 
-import os
-import sys
 import json
 import requests
 import time
+import logging
 
-# The Alpaca bridge on port 5555 is the verified source for 'Value' nested responses.
-# Index /1/ is designated for the S30.
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logger = logging.getLogger("MountControl")
+
 BRIDGE_URL = "http://127.0.0.1:5555/api/v1/telescope/1/action"
 
-def get_mount_coords():
-    """Interrogates the Alpaca bridge for equatorial coordinates via native method_sync."""
+def _call_bridge(method, params=None):
+    """Internal helper for Alpaca JSON-RPC communication."""
     payload = {
         "Action": "method_sync",
-        "Parameters": json.dumps({"method": "scope_get_equ_coord"}),
+        "Parameters": json.dumps({"method": method, **(params or {})}),
         "ClientID": 999,
         "ClientTransactionID": int(time.time())
     }
-    
     try:
-        # Alpaca actions typically require PUT requests
         response = requests.put(BRIDGE_URL, data=payload, timeout=5)
-        
         if response.status_code != 200:
             return None
-            
-        data = response.json()
         
-        # Accessing the nested 'Value' block where the hardware JSON-RPC response lives
-        if "Value" in data:
-            # Depending on bridge version, Value might be a string or a dict
-            inner_val = data["Value"]
-            if isinstance(inner_val, str):
-                inner_val = json.loads(inner_val)
-            
-            # Navigate to the result block for RA and Dec
-            if "result" in inner_val:
-                res = inner_val["result"]
-                return {
-                    "ra": res.get("ra"),
-                    "dec": res.get("dec")
-                }
+        data = response.json()
+        val = data.get("Value")
+        if isinstance(val, str):
+            val = json.loads(val)
+        return val.get("result") if val else None
+    except Exception as e:
+        logger.debug(f"Bridge call failed: {e}")
         return None
-            
-    except Exception:
-        return None
+
+def get_mount_coords():
+    """Retrieves current equatorial coordinates."""
+    res = _call_bridge("scope_get_equ_coord")
+    if res:
+        return {"ra": res.get("ra"), "dec": res.get("dec")}
+    return None
+
+def slew_to_target(ra, dec):
+    """Commands the mount to slew to specific J2000 coordinates."""
+    logger.info(f"🔭 Slew Initiated: RA {ra:.4f} | DEC {dec:.4f}")
+    # Note: S30 internal engine usually expects 'iscope_start_view' or 'scope_goto'
+    params = {"ra": ra, "dec": dec, "lp": 0} 
+    res = _call_bridge("scope_goto", params)
+    return res is not None
+
+def is_tracking():
+    """Checks if the mount is currently tracking."""
+    res = _call_bridge("get_setting")
+    if res:
+        return res.get("is_tracking", False)
+    return False
 
 if __name__ == "__main__":
     coords = get_mount_coords()
     if coords and coords.get("ra") is not None:
-        print(f"✨ Orientation Secured: RA {coords['ra']:.4f} | DEC {coords['dec']:.4f}")
+        logger.info(f"✨ Orientation Secured: RA {coords['ra']:.4f} | DEC {coords['dec']:.4f}")
     else:
-        # Fallback to general status if specific coordinates fail
-        print("⚠️ Equatorial coordinates not found in current stream.")
+        logger.warning("⚠️ Mount orientation unavailable.")

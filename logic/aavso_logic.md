@@ -1,29 +1,17 @@
-# 🧬 AAVSO LOGIC & AUTHENTICATION (S30-PRO)
+# 🧬 AAVSO LOGIC & AUTHENTICATION
 
-> **Objective**: Define the authenticated handshake for the AAVSO VSP API.
-> **Scope**: Universal (Reusable for any $USER with valid credentials).
+> **Objective**: Manage the handshake between Seestar data and AAVSO standards.
+> **Version**: 1.3.0
 
-## 1. Authentication Requirements
-The system requires three keys defined in the local `config.toml` under the `[aavso]` block. These must NOT be committed to version control.
+## 🔗 VSP API Connection (External)
+- **Canonical Host**: `apps.aavso.org`
+- **Endpoint**: `/vsp/api/chart/`
+- **Auth**: HTTP Basic (Username: `TARGET_KEY`, Password: `api_token`)
 
-| Config Key | API Header | Purpose |
-| :--- | :--- | :--- |
-| `observer_code` | `X-Observer-Code` | Unique AAVSO Observer Identifier |
-| `target_key` | `X-Target-Key` | VSP API Access Key |
-| `webobs_token` | `Authorization: Bearer` | Session Token for WebObs/API |
+## 🔭 Photometry Requirements (S30-PRO)
+- **Primary Channel**: Green (extract from RGGB Bayer for Johnson V approximation).
+- **Sub-Exposures**: 30s - 60s single RAW frames (via `start_exposure`).
+- **Reporting**: Data must be formatted to the AAVSO Extended Format (REDA).
 
-## 2. Verified Infrastructure
-- **Canonical Host**: `apps.aavso.org` (Direct access to API engine).
-- **Endpoint**: `/vsp/api/chart/`.
-- **Method**: `GET`.
-
-## 3. Implementation Protocol
-To prevent 401/404 errors during (re)-installation:
-1. Use `apps.aavso.org` to avoid redirect header stripping.
-2. Pass `star` as a URL-encoded parameter.
-3. Apply `fov=60` and `maglimit=15.0` as baseline S30-PRO defaults.
-4. **Pi-Sleep**: A mandatory 188.4s delay between requests to respect AAVSO bandwidth.
-
-## 4. Troubleshooting
-- **"No Chart matches"**: Check naming convention in `targets.json` (use `name` key).
-- **"Unauthorized"**: Verify `target_key` and `webobs_token` in `config.toml`.
+## ⏳ Throttling (The "Pi-Sleep")
+- **Mandatory Delay**: 31.4s between API calls to `apps.aavso.org` to avoid IP lockout.

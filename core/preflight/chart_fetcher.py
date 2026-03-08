@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/preflight/chart_fetcher.py
-Version: 1.2.0
-Objective: Step 2 - Cross-reference local reference_stars and fetch missing charts with a 90' FOV and Mag 15 limit.
+Version: 1.3.0
+Objective: Fetch missing AAVSO VSP charts. Supports targeted fetch via CLI or full audit.
 """
 import json
 import time
@@ -17,54 +17,41 @@ logger = logging.getLogger("AAVSO_Step2")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_DIR = PROJECT_ROOT / "catalogs"
-MASTER_HAUL_FILE = CATALOG_DIR / "aavso_master_haul.json"
+# Updated to match production naming
+MASTER_HAUL_FILE = CATALOG_DIR / "campaign_targets.json"
 REF_DIR = CATALOG_DIR / "reference_stars"
 
 POLL_DELAY_SECONDS = 31.4
 
-def fetch_missing_charts():
-    if not MASTER_HAUL_FILE.exists():
-        logger.error(f"❌ Master haul not found at {MASTER_HAUL_FILE}. Run Step 1 first.")
-        sys.exit(1)
-        
-    with open(MASTER_HAUL_FILE, 'r') as f:
-        targets = json.load(f)
-        
-    if not targets:
-        logger.error("❌ Master haul is empty.")
-        sys.exit(1)
-        
-    logger.info(f"📡 STEP 2: Auditing {len(targets)} targets against local reference_stars library...")
-    
+def fetch_charts(target_list=None):
+    if target_list:
+        logger.info(f"🎯 Targeted Fetch: {len(target_list)} stars requested.")
+        process_list = target_list
+    else:
+        if not MASTER_HAUL_FILE.exists():
+            logger.error(f"❌ Library not found: {MASTER_HAUL_FILE}")
+            return
+        with open(MASTER_HAUL_FILE, 'r') as f:
+            data = json.load(f)
+            targets = data.get("targets", []) if isinstance(data, dict) else data
+        process_list = [t['name'] for t in targets if 'name' in t]
+        logger.info(f"📡 Audit Mode: Checking {len(process_list)} targets...")
+
     api_hits = 0
-    missing_count = 0
-    
-    for target in targets:
-        star_name = target.get("name")
-        if not star_name: continue
-            
-        safe_name = star_name.replace(" ", "_").upper()
-        out_file = REF_DIR / f"{safe_name}_comps.json"
+    for star_name in process_list:
+        clean_name = star_name.lower().replace(' ', '_').replace('-', '_')
+        out_file = REF_DIR / f"{clean_name}.json"
         
-        # The Auditor: Check if chart is already in your reference_stars folder
         if out_file.exists():
             continue
             
-        missing_count += 1
         if api_hits > 0:
             logger.info(f"⏳ Throttling: Waiting {POLL_DELAY_SECONDS}s...")
             time.sleep(POLL_DELAY_SECONDS)
             
-        logger.info(f"🔭 Fetching missing Comparison Chart for {star_name} (FOV: 90')...")
-        
+        logger.info(f"🔭 Fetching Chart for {star_name} (90' FOV, Mag 15)...")
         vsp_url = "https://apps.aavso.org/vsp/api/chart/"
-        # 90 arcminute FOV injected here
-        vsp_params = {
-            "format": "json", 
-            "star": star_name,
-            "fov": 90,
-            "maglimit": 15.0
-        }
+        vsp_params = {"format": "json", "star": star_name, "fov": 90, "maglimit": 15.0}
         
         try:
             res = requests.get(vsp_url, params=vsp_params, timeout=15)
@@ -72,18 +59,14 @@ def fetch_missing_charts():
                 comps = res.json().get("photometry", [])
                 with open(out_file, "w") as f:
                     json.dump(comps, f, indent=4)
-                logger.info(f"✅ Cached {len(comps)} comparison stars to {out_file.name}")
+                logger.info(f"✅ Cached {len(comps)} comparison stars.")
             else:
-                logger.warning(f"⚠️ VSP Error {res.status_code} for {star_name}: {res.text.strip()}")
+                logger.warning(f"⚠️ VSP Error {res.status_code} for {star_name}")
         except Exception as e:
-            logger.error(f"❌ Failed VSP fetch for {star_name}: {e}")
-            
+            logger.error(f"❌ Failed fetch for {star_name}: {e}")
         api_hits += 1
-        
-    if missing_count == 0:
-        logger.info("🎉 Vault is sealed. All comparison charts are already secured locally. Zero API calls needed.")
-    else:
-        logger.info(f"🏁 Step 2 Complete. Fetched {missing_count} missing charts.")
 
 if __name__ == "__main__":
-    fetch_missing_charts()
+    # If arguments are passed, use them as star names. Otherwise, audit the library.
+    manual_targets = sys.argv[1:]
+    fetch_charts(manual_targets if manual_targets else None)

@@ -24,6 +24,7 @@ class VaultManager:
         return {}
 
     def get_observer_config(self):
+        # Aligned with your config.toml sections
         aavso = self.data.get("aavso", {})
         loc = self.data.get("location", {})
         planner = self.data.get("planner", {})
@@ -45,14 +46,16 @@ class VaultManager:
         current_lat = self.data["location"].get("lat")
         current_mh = self.data["location"].get("maidenhead")
         
-        if current_lat != new_lat and current_mh != new_mh:
+        if current_lat != new_lat or current_mh != new_mh:
             self.data["location"]["lat"] = new_lat
             self.data["location"]["lon"] = new_lon
             self.data["location"]["maidenhead"] = new_mh
             self.data["location"]["last_refresh"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.data["location"]["source"] = "GPSD_AUTO"
             
-            with open(self.config_path, "w") as f:
-                toml.dump(self.data, f)
-            return True
-        return False
+            try:
+                with open(self.config_path, "w") as f:
+                    toml.dump(self.data, f)
+                return True
+            except Exception:
+                return False
+        return True

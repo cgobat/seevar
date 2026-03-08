@@ -23,7 +23,7 @@ logger = logging.getLogger("AAVSO_Step1")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = PROJECT_ROOT / "config.toml"
 CATALOG_DIR = PROJECT_ROOT / "catalogs"
-MASTER_HAUL_FILE = CATALOG_DIR / "aavso_master_haul.json"
+MASTER_HAUL_FILE = CATALOG_DIR / "campaign_targets.json"
 
 # PHYSICS CONSTRAINTS
 MAG_LIMIT = 15.0

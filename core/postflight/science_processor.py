@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: /home/ed/seestar_organizer/core/postflight/science_processor.py
-Version: 3.0.0
-Objective: Automate Siril Green-channel extraction with dynamic flat-field detection.
+Version: 3.1.0
+Objective: Automate Siril Green-channel extraction matching the Sovereign Pilot handoff.
 """
 
 import os
@@ -23,30 +23,26 @@ class ScienceProcessor:
         self.process_path.mkdir(parents=True, exist_ok=True)
 
     def process_green_stack(self, target_name):
-        """
-        Generates and executes a dynamic Siril Script (.ssf) for the target.
-        """
         script_path = self.process_path / f"{target_name}_macro.ssf"
         safe_name = target_name.replace(" ", "_")
+        # Matches the Pilot handoff suffix
+        raw_file = f"{safe_name}_Raw.fits"
         
-        # Start Siril Macro
         siril_commands = [
             f'cd "{self.raw_path.absolute()}"',
-            f'convert {safe_name}_ -out="{self.process_path.absolute()}/"',
+            f'convert {raw_file} -out="{self.process_path.absolute()}/seq_{safe_name}"',
             f'cd "{self.process_path.absolute()}"'
         ]
         
-        # Dynamic Calibration Check
         flat_path = self.raw_path / "master-flat.fits"
         if flat_path.exists():
             logger.info("🪟 Master Flat detected. Injecting calibration step...")
-            siril_commands.append(f'calibrate {safe_name}_ -flat="{flat_path.absolute()}" -cfa')
-            seq_to_extract = f'pp_{safe_name}_'
+            siril_commands.append(f'calibrate seq_{safe_name} -flat="{flat_path.absolute()}" -cfa')
+            seq_to_extract = f'pp_seq_{safe_name}'
         else:
             logger.warning("⚠️ No Master Flat found. Proceeding with uncalibrated raw extraction.")
-            seq_to_extract = f'{safe_name}_'
+            seq_to_extract = f'seq_{safe_name}'
             
-        # Extraction and Stacking
         siril_commands.extend([
             f'extract {seq_to_extract} -green',
             f'register g_{seq_to_extract}',
@@ -57,27 +53,13 @@ class ScienceProcessor:
         try:
             with open(script_path, 'w') as f:
                 f.write('\n'.join(siril_commands))
-            
             logger.info(f"🧪 Handing over to Siril CLI for {target_name}...")
-            
-            result = subprocess.run(
-                ['siril-cli', '-s', str(script_path)], 
-                capture_output=True, 
-                text=True
-            )
-            
-            if result.returncode == 0:
-                logger.info(f"🏆 Green Diamond Forged: {self.process_path.name}/{safe_name}_Green_Final.fit")
-                return True
-            else:
-                logger.error(f"❌ Siril CLI Error:\n{result.stderr}")
-                return False
-                
+            result = subprocess.run(['siril-cli', '-s', str(script_path)], capture_output=True, text=True)
+            return result.returncode == 0
         except Exception as e:
             logger.error(f"❌ Pipeline Engine Failure: {e}")
             return False
 
 if __name__ == "__main__":
     processor = ScienceProcessor()
-    # Test against the mock data we generated
     processor.process_green_stack("CH_Cyg")

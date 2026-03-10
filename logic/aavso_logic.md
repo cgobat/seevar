@@ -1,3 +1,14 @@
+# 🧬 AAVSO LOGIC
+
+** Objective: Rules for scientific targeting, cadence, and AAVSO report formatting.
+
+# 🧬 AAVSO LOGIC
+
+** Objective: Rules for scientific targeting, cadence, and AAVSO report formatting.
+
+# 🧬 AAVSO LOGIC
+
+** Objective: Rules for scientific targeting, cadence, and AAVSO report formatting.
 # 🧬 AAVSO LOGIC & AUTHENTICATION
 
 > **Objective**: Manage the handshake between Seestar data and AAVSO standards.

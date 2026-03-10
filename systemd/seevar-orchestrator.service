@@ -1,0 +1,17 @@
+[Unit]
+Description=SeeVar Project - Science Orchestrator
+After=network-online.target
+
+[Service]
+Type=simple
+User=ed
+WorkingDirectory=/home/ed/seevar
+ExecStartPre=/home/ed/seevar/.venv/bin/python3 /home/ed/seevar/utils/mount_guard.py
+ExecStart=/home/ed/seevar/.venv/bin/python3 main.py
+Restart=always
+RestartSec=15
+StandardOutput=append:/home/ed/seevar/logs/orchestrator.log
+StandardError=append:/home/ed/seevar/logs/orchestrator.err
+
+[Install]
+WantedBy=multi-user.target

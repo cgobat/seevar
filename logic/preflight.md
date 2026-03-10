@@ -1,13 +1,11 @@
-By mapping the inputs and outputs of the Python scripts you just uploaded, the linear execution order for Phase 1 (The Data Funnel) reveals itself:
+# 🚀 PREFLIGHT CHECKLIST
 
-state_flusher.py: Sweeps the board clean. Resets data/system_state.json to IDLE so the dashboard isn't showing ghost data from a previous run.
+** Objective: Safety checks and environmental verification required before opening the dome.
 
-aavso_fetcher.py (Step 1): Reaches out to the AAVSO, applies the physics constraints (MAG <= 15, DEC >= -7.62), and generates catalogs/campaign_targets.json.
-
-chart_fetcher.py (Step 2): Reads the master haul and pulls down the required 90' FOV photometry charts into catalogs/reference_stars/.
-
-librarian.py: Acts as the gatekeeper. It cross-references the targets against the downloaded charts and outputs the definitive catalogs/federation_catalog.json.
-
-nightly_planner.py: Reads the federated catalog, calculates real-time Alt/Az against your Haarlem GPS coordinates, enforces the 30° limit, and generates the initial data/tonights_plan.json.
-
-ledger_manager.py: The final triage. It checks the historical data/ledger.json, applies the 3-day sovereign cadence rule, and permanently filters data/tonights_plan.json down to only the targets that are strictly 'DUE'.
+## Phase 1: The Data Funnel
+1. **state_flusher.py**: Resets `system_state.json` to IDLE.
+2. **aavso_fetcher.py**: Hauls targets from AAVSO TargetTool.
+3. **chart_fetcher.py**: Downloads 90' FOV photometry charts.
+4. **librarian.py**: Cross-references targets against local chart cache.
+5. **nightly_planner.py**: Filters by Haarlem physical horizon (30° floor).
+6. **ledger_manager.py**: Applies the 3-day scientific cadence rule.

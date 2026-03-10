@@ -60,7 +60,6 @@
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .critical { color: var(--neon-purple) !important; text-shadow: 0 0 8px var(--purple-glow), 0 0 12px var(--purple-glow); background: none !important; }
 
-        /* 🔥 BOTTOM BAR STYLES 🔥 */
         .bottom-bar { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #333; padding-top: 15px; margin-top: 20px; font-size: 0.85em; }
         .hw-stats { display: flex; flex-direction: column; gap: 8px; font-weight: bold; width: 250px;}
         .stat-line { display: flex; align-items: center; }
@@ -73,6 +72,9 @@
         .flight-log-container { flex: 1; display: flex; flex-direction: column; gap: 4px; border-left: 1px dashed #333; padding-left: 20px; margin-left: 20px; height: 80px; overflow: hidden; justify-content: flex-end;}
         .log-line { color: var(--text-muted); font-size: 0.9em; white-space: nowrap; }
         .log-line.latest { color: var(--text-bright); font-weight: bold; }
+
+        .siril-box { background: #111; padding: 10px; font-size: 0.75em; color: #aaa; border: 1px solid #222; margin-top: 15px; min-height: 100px; display: flex; flex-direction: column; gap: 4px; }
+        .siril-line { border-bottom: 1px solid #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         @media (max-width: 900px) {
             body { padding: 5px; }
@@ -126,6 +128,9 @@
             <h2>POSTFLIGHT AUDIT</h2>
             <div class="row"><span class="label">LAST AUDIT</span> <span class="val" id="audit-stamp">N/A</span></div>
             <div class="row"><span class="label">KNVWS REPORT</span> <span class="val" id="r-stamp">AWAITING LIGHT</span></div>
+            <div class="row"><span class="label">PHOTOMETRY</span> <div id="led-phot" class="led grey"></div></div>
+            <div class="row"><span class="label">AAVSO READY</span> <div id="led-aavso" class="led grey"></div></div>
+            <div class="siril-box" id="siril-log-box"></div>
         </div>
     </div>
 
@@ -157,9 +162,12 @@
             countLed.className = "led green";
             countLed.innerText = targetData.length.toString().padStart(2, '0');
             const t = targetData[tickerIndex];
-            document.getElementById('t-name').innerText = t.star_name || "UNKNOWN";
+            
+            // FIX: Checking for exactly "name" and "type" first, with original fallbacks
+            document.getElementById('t-name').innerText = t.name || t.star_name || "UNKNOWN";
             document.getElementById('t-name').className = (t.priority) ? "val critical" : "val";
-            document.getElementById('t-type').innerText = t.var_type || "N/A";
+            document.getElementById('t-type').innerText = t.type || t.var_type || "N/A";
+            
             const ra = t.ra ? parseFloat(t.ra).toFixed(2) : "--";
             const dec = t.dec ? parseFloat(t.dec).toFixed(2) : "--";
             const con = t.constellation || "UNK";
@@ -177,7 +185,6 @@
                     if(data.maidenhead) document.getElementById('telemetry-mh').innerText = data.maidenhead;
                     if(data.last_audit) document.getElementById('audit-stamp').innerText = data.last_audit;
 
-                    // Weather UI Injection
                     if(data.weather) {
                         const rows = document.querySelectorAll('.row');
                         rows.forEach(row => {
@@ -185,12 +192,11 @@
                                 row.querySelector('.val').innerText = data.weather.status;
                                 const led = row.querySelector('.led');
                                 led.innerText = data.weather.icon;
-                                led.style.color = '#fff'; // Reveal emoticon
+                                led.style.color = '#fff';
                             }
                         });
                     }
 
-                    // 1. Process Orchestrator State
                     if(data.orchestrator) {
                         const state = data.orchestrator.state || 'PARKED';
                         document.getElementById('orch-main').innerText = state;
@@ -224,7 +230,6 @@
                         }
                     }
 
-                    // 2. Process Hardware Telemetry
                     if(data.hardware) {
                         const linkVal = document.getElementById('tel-link-val');
                         const linkLed = document.getElementById('tel-link-led');
@@ -251,6 +256,14 @@
                         }
 
                         storeTxt.innerText = (data.hardware.storage_mb !== "N/A") ? data.hardware.storage_mb + " MB" : "-- MB";
+                    }
+
+                    if(data.science) {
+                        document.getElementById('led-phot').className = `led ${data.science.photometry}`;
+                        document.getElementById('led-aavso').className = `led ${data.science.aavso_ready}`;
+                        let logHtml = '';
+                        data.science.siril_tail.forEach(line => { logHtml += `<div class="siril-line">> ${line}</div>`; });
+                        document.getElementById('siril-log-box').innerHTML = logHtml;
                     }
                 })
                 .catch(err => console.error("Telemetry error:", err));

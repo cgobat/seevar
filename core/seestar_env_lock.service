@@ -1,16 +1,22 @@
 [Unit]
-Description=Federation Environment Guardian (v1.5.4 - Final Stake)
-After=network.target
+Description=Federation Environment Guardian (v1.5.5 - Armored Stake)
+# Force it to wait for an actual IP address/internet connection
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 User=ed
 WorkingDirectory=/home/ed/seestar_organizer
-# We use the system python to run the hunter, providing the absolute path to the script
 ExecStart=/usr/bin/python3 /home/ed/seestar_organizer/core/utils/env_vampire_hunter.py
 StandardOutput=append:/home/ed/seestar_organizer/logs/guardian_debug.log
 StandardError=append:/home/ed/seestar_organizer/logs/guardian_debug.log
 RemainAfterExit=yes
+
+# The Armor: If it crashes because the scope/network is missing, wait 30s and try again
+Restart=on-failure
+RestartSec=30
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

@@ -1,3 +1,14 @@
+# 📡 COMMUNICATION PROTOCOL
+
+** Objective: Defines the JSON-RPC handshakes and payload structures for Alpaca communication.
+
+# 📡 COMMUNICATION PROTOCOL
+
+** Objective: Defines the JSON-RPC handshakes and payload structures for Alpaca communication.
+
+# 📡 COMMUNICATION PROTOCOL
+
+** Objective: Defines the JSON-RPC handshakes and payload structures for Alpaca communication.
 # 📡 Seestar S30 (Wilhelmina) Communication Protocol & API Guide
 
 **Version:** 1.1 (Includes Goto & Action Form Mapping)

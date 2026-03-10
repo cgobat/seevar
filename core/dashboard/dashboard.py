@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/dashboard/dashboard.py
-Version: 4.3.0
-Objective: Flawless integration with caching and Weather Emoticon.
+Version: 4.4.6
+Objective: Flawless integration with caching, Weather Emoticon, Postflight Science telemetry, and dynamic 6-char Maidenhead.
 """
 import json, os, sys, time, requests, tomllib
 from flask import Flask, render_template, jsonify
@@ -16,8 +16,11 @@ PLAN_FILE = DATA_DIR / "tonights_plan.json"
 STATE_FILE = DATA_DIR / "system_state.json"
 LEDGER_FILE = DATA_DIR / "ledger.json"
 WEATHER_FILE = DATA_DIR / "weather_state.json"
+SIRIL_LOG = PROJECT_ROOT / "logs" / "siril_extraction.log"
 
 sys.path.append(str(PROJECT_ROOT))
+from core.utils.observer_math import get_maidenhead_6char
+
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
 
 HW_CACHE = {"timestamp": 0, "data": {"link_status": "OFFLINE", "battery": "N/A", "storage_mb": "N/A"}}
@@ -42,9 +45,16 @@ def get_seestar_ip():
 
 def get_location_data():
     org_cfg = load_config("~/seestar_organizer/config.toml")
+    loc = org_cfg.get("location", {})
+    lat, lon = loc.get("lat"), loc.get("lon")
+    
+    # Prioritize the dynamic 6-character math
+    if lat is not None and lon is not None:
+        return get_maidenhead_6char(float(lat), float(lon))
+        
+    # Fallback to config strings if math fails
     obs = org_cfg.get("observer", {})
     if "maidenhead" in obs: return obs["maidenhead"]
-    loc = org_cfg.get("location", {})
     if "maidenhead" in loc: return loc["maidenhead"]
     return "NO-GPS-LOCK"
 
@@ -109,11 +119,30 @@ def telemetry():
     if LEDGER_FILE.exists():
         audit = time.strftime('%H:%M:%S', time.localtime(os.path.getmtime(LEDGER_FILE)))
 
+    science = {"photometry": "grey", "aavso_ready": "grey", "siril_tail": []}
+    if SIRIL_LOG.exists():
+        try:
+            with open(SIRIL_LOG, 'r') as f:
+                science["siril_tail"] = [line.strip() for line in f.readlines()[-5:]]
+        except: pass
+
+    if (DATA_DIR / "reports").exists() and list((DATA_DIR / "reports").glob("*.txt")):
+        science["aavso_ready"] = "green"
+
+    qc_path = PROJECT_ROOT / "core/postflight/data/qc_report.json"
+    if qc_path.exists():
+        try:
+            with open(qc_path, 'r') as f:
+                qc = json.load(f)
+                science["photometry"] = "green" if qc.get("status") == "PASS" else "orange"
+        except: pass
+
     return jsonify({
         "maidenhead": get_location_data(),
         "orchestrator": state,
         "hardware": fetch_hardware_vitals(),
         "weather": weather,
+        "science": science,
         "last_audit": audit
     })
 

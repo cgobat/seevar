@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
+Filename: /home/ed/seestar_organizer/core/postflight/analyst.py
+Version: 1.0.0
 Objective: Analyzes FITS image quality, FWHM, and basic observational metrics.
-"""
-"""
 """
 
 import subprocess
@@ -21,11 +23,8 @@ class Analyst:
             with open(config_file, "rb") as f:
                 data = tomllib.load(f)
                 solver_cfg = data.get("solver", {})
-                
-                # Expand the ~ to the actual /home/ed path
                 raw_config_path = solver_cfg.get("config_path", "/etc/astrometry.cfg")
                 self.config_path = Path(raw_config_path).expanduser()
-                
                 self.scale_low = solver_cfg.get("scale_low", 3.5)
                 self.scale_high = solver_cfg.get("scale_high", 4.0)
                 self.search_radius = solver_cfg.get("search_radius", 5.0)
@@ -58,26 +57,18 @@ class Analyst:
         ]
         
         if hint_ra is not None and hint_dec is not None:
-            cmd.extend([
-                "--ra", str(hint_ra),
-                "--dec", str(hint_dec),
-                "--radius", str(self.search_radius)
-            ])
+            cmd.extend(["--ra", str(hint_ra), "--dec", str(hint_dec), "--radius", str(self.search_radius)])
             
         log_event(f"Analyst: Running solve-field on {fits_path.name}...")
         
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            
             if wcs_file.exists():
                 log_event(f"Analyst: Plate solve successful -> {wcs_file.name}")
                 return wcs_file
             else:
-                log_event(f"Analyst: Plate solve failed. Output:", level="error")
-                log_event(result.stdout[:300], level="error")
-                log_event(result.stderr[:300], level="error")
+                log_event("Analyst: Plate solve failed.", level="error")
                 return None
-                
         except Exception as e:
             log_event(f"Analyst: Critical subprocess error: {e}", level="error")
             return None

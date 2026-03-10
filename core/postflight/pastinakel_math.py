@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Filename: /home/ed/seestar_organizer/core/postflight/pastinakel_math.py
+Version: 1.1.1
 Objective: Logic for saturation detection and dynamic aperture scaling.
 """
-#
-# Seestar Organizer - Pastinakel Math (v1.1)
-# Path: ~/seestar_organizer/core/postflight/pastinakel_math.py
-# ----------------------------------------------------------------
 
 def check_saturation(pixel_data, ceiling=60000):
     """
@@ -27,7 +25,6 @@ def calculate_dynamic_aperture(fwhm):
     return round(fwhm * multiplier, 2)
 
 if __name__ == "__main__":
-    # Internal Test with dummy data
     import numpy as np
     mock_star = np.array([100, 500, 62000, 500, 100])
     saturated, val = check_saturation(mock_star)

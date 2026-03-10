@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
+Filename: /home/ed/seestar_organizer/core/postflight/pixel_mapper.py
+Version: 1.0.1
 Objective: Converts celestial WCS coordinates to local sensor pixel X/Y coordinates.
 """
-"""
-Filename: core/pixel_mapper.py
-"""
+
 import warnings
 from astropy.wcs import WCS
 from astropy.utils.exceptions import AstropyWarning
@@ -12,7 +14,6 @@ def get_pixel_coords(wcs_file, ra, dec):
     """
     Translates RA/Dec to Pixel X/Y with noise suppression.
     """
-    # Silence the axis mismatch warning for spoofed/compressed FITS
     warnings.filterwarnings('ignore', category=AstropyWarning, append=True)
     
     try:

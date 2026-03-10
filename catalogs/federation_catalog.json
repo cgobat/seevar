@@ -1,7 +1,7 @@
 {
+    "#objective": "Validated and deduplicated target list for nightly planning.",
     "metadata": {
-        "objective": "Validated and deduplicated target list for nightly planning.",
-        "generated": "2026-03-09T16:46:30.168015",
+        "generated": "2026-03-10T14:18:14.235370",
         "schema_version": "2026.1"
     },
     "data": [
@@ -1050,6 +1050,15 @@
             "duration": 600
         },
         {
+            "name": "alf Ori",
+            "ra": 88.79292,
+            "dec": 7.40706,
+            "type": "SRC",
+            "mag_max": 0.0,
+            "priority": 2,
+            "duration": 600
+        },
+        {
             "name": "R Peg",
             "ra": 346.66321,
             "dec": 10.54336,
@@ -1262,6 +1271,15 @@
             "dec": 34.65764,
             "type": "EA/DM",
             "mag_max": 7.29,
+            "priority": 2,
+            "duration": 600
+        },
+        {
+            "name": "eps Aur",
+            "ra": 75.49221,
+            "dec": 43.82331,
+            "type": "E-DO/GS+SRD",
+            "mag_max": 2.92,
             "priority": 2,
             "duration": 600
         },

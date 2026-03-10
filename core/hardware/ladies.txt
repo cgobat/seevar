@@ -1,0 +1,4 @@
+Organizer
+   ├─ Wilhelmina (photometry)
+   ├─ Anna (photometry / classification)
+   └─ Henrietta (spectroscopy or long-period monitoring)

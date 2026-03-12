@@ -107,3 +107,13 @@ The complete capture sequence executed by `DiamondSequence.acquire()`:
 
 Implementation: `core/flight/pilot.py` — `DiamondSequence`, `ControlSocket`,
 `ImageSocket`.
+
+## Error Codes
+
+Observed on the JSON-RPC control channel (port 4700):
+
+| Code | Meaning | Resolution |
+|------|---------|------------|
+| `103` | Method not found | Malformed JSON payload or unrecognised method name |
+| `1031` | Not connected | Device dropped connection — reconnect and retry |
+| `0 bytes` | Silent failure / session lock | SSC UI may be holding control authority — send `iscope_stop_view` first |

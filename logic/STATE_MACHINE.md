@@ -1,60 +1,100 @@
-# 🤖 S30-PRO SOVEREIGNTY: THE STATE MACHINE
+# 🤖 SEEVAR: THE STATE MACHINE
 
-> **Objective:** Deterministic control over hardware transitions via JSON-RPC.
-> **Version:** 2.0.0 (The "Diamond" Revision)
+> **Objective:** Deterministic hardware transitions for sovereign AAVSO
+> acquisition via direct TCP to the S30-Pro.
+> **Version:** 3.0.0 (Praw)
+> **Path:** `logic/STATE_MACHINE.md`
 
----
-
-## 🏗️ PHASE 1: INITIALIZATION (IDLE → READY)
-Before science begins, we force a "Clean Slate."
-
-| Action | JSON-RPC Method | Expected Value | Failure / Recovery |
-| :--- | :--- | :--- | :--- |
-| **Kill UI/App** | `iscope_stop_view` | `{"result": 0}` | Mandatory to break ZWO Stacking locks. |
-| **Set Gain** | `set_control_value` | `["gain", 80]` | Fixes sensitivity for Photometry. |
-| **Shutter** | `set_setting` | `{"exp_ms": {...}}` | Pre-sets timing for the `start_exposure` call. |
+Implementation: `core/flight/pilot.py` `DiamondSequence.acquire()`.
+Pipeline state machine: `core/flight/orchestrator.py`.
+Confirmed methods: `API_PROTOCOL.MD`.
 
 ---
 
-## 🔭 PHASE 2: NAVIGATION (QUEUED → TRACKING)
-We don't trust the mount; we verify the sky.
+## 🏗️ PHASE 1: INITIALISATION (IDLE → READY)
 
-### 1. The Slew
-- **Command**: `scope_goto` with `[ra, dec]`
-- **Progression**: Poll `get_event_state`.
-- **Requirement**: `is_slewing` must transition `True -> False`.
+Force a clean slate before any science begins.
 
-### 2. The Solve (Entering the Cave)
-- **Command**: `start_solve`
-- **Demand**: Poll `get_solve_result` until `code` is returned.
-- **Outcome 0**: Success. Transition to **INTEGRATING**.
-- **Outcome 207**: "Fail to operate." **Recovery**: Offset mount by 0.5° and retry.
-- **Outcome 400/500**: Bridge Error. **Recovery**: Restart Alpaca Service.
+| Action | Method (port 4700) | Params | Notes |
+|--------|-------------------|--------|-------|
+| **Clear session** | `iscope_stop_view` | — | Breaks any active ZWO stacking lock. Always first. |
+| **Set gain** | `set_control_value` | `["gain", 80]` | Fixed sensitivity for photometry. |
+| **Set exposure** | `set_setting` | `{"exp_ms": {"stack_l": 5000}}` | Pre-sets timing before stream opens. |
+| **Health check** | `get_device_state` | — | Any valid JSON response = device alive. |
 
 ---
 
-## 📸 PHASE 3: SCIENCE (INTEGRATING → VERIFYING)
-Bypassing the consumer stacker to get pure RAW data.
+## 🔭 PHASE 2: NAVIGATION (READY → TRACKING)
 
-| Step | Command / Polling | Success Condition |
-| :--- | :--- | :--- |
-| **Trigger** | `start_exposure` | `["light", false]` (Single Frame Mode) |
-| **Monitor** | `get_exp_status` | Status transitions from `Exposing` to `Idle`. |
-| **Check** | `get_view_state` | `new_image: true` must appear. |
+We point the mount. We do not poll — we settle.
+
+### Slew
+- **Method**: `scope_sync [ra_hours, dec_deg]` on port 4700
+- **Wait**: `SETTLE_SECONDS = 8` fixed sleep post-sync
+- **Rationale**: Sovereign path does not poll `get_event_state`.
+  The settle window absorbs mount motion reliably for the S30-Pro.
+
+### Plate Solve (optional — post-slew verification)
+- **Method**: `start_solve` on port 4700
+- **Poll**: `get_solve_result` until `code` is returned
+- **Outcome 0**: Centred. Proceed to Phase 3.
+- **Outcome 207**: Fail to operate. Recovery: offset mount 0.5° and retry.
+- **Outcome 400/500**: Bridge error. Recovery: restart `seestar.service`.
+
+Plate solving is not part of the standard `DiamondSequence` loop.
+It is available as a recovery step when acquisition fails repeatedly
+on a target.
 
 ---
 
-## 📉 PHASE 4: HARVEST (VERIFYING → COMPLETED)
-Moving the "Diamond" from the telescope to the Pi.
+## 📸 PHASE 3: SCIENCE (TRACKING → INTEGRATING)
 
-1. **Pull**: Execute `get_stacked_img` to pull the binary FITS data.
-2. **Log**: Record the midpoint UTC timestamp (AAVSO requirement).
-3. **Clean**: Once file is verified in `local_buffer/`, proceed to next iteration.
+Bypassing the consumer stacker for pure RAW data.
+
+| Step | Action | Detail |
+|------|--------|--------|
+| **Open stream** | `iscope_start_view {"mode": "star"}` port 4700 | Begins ContinuousExposure stage |
+| **Wait** | sleep 2.0s | Allow first frame to arrive on port 4801 |
+| **Receive** | Binary stream port 4801 | Read 80-byte header → parse frame_id |
+| **Filter** | `frame_id == 21` | Preview frame — raw uint16 Bayer GRBG |
+| **Validate** | `len(data) == width × height × 2` | Payload size check — mismatch = skip frame |
+| **Close stream** | `iscope_stop_view` port 4700 | End session cleanly |
+
+Heartbeat packets (`payload < 1000 bytes`) are silently skipped.
+Stack frames (`frame_id == 23`) are silently skipped.
+`FRAME_TIMEOUT = 60s` — if no frame_id 21 arrives within timeout,
+acquisition fails and target is removed from tonight's queue.
 
 ---
 
-## ⚠️ CRITICAL VETO LOGIC (ANY STATE)
-If these conditions occur, the machine must transition to **PARKING** immediately:
-- **`get_device_state` (battery)**: `< 10%`.
-- **`get_device_state` (temp)**: `> 55.0C`.
-- **Heartbeat Lost**: No response from Alpaca Port 5555 for > 10 seconds.
+## 📦 PHASE 4: HARVEST (INTEGRATING → COMPLETED)
+
+The Diamond lands on RAID1.
+
+1. **Reshape** — `np.frombuffer(raw, dtype=np.uint16).reshape(height, width)`
+2. **Stamp** — `sovereign_stamp()` writes AAVSO-compliant FITS header:
+   `OBJECT`, `OBJCTRA`, `OBJCTDEC`, `DATE-OBS`, `EXPTIME`, `INSTRUME`,
+   `TELESCOP`, `FILTER=CV`, `BAYERPAT=GRBG`, `OBSERVER`, `AUID`.
+3. **Write** — `write_fits()` → `data/local_buffer/{TARGET}_{TS}_Raw.fits`
+   Pure struct + numpy — no astropy dependency.
+4. **Log** — `data/ledger.json` updated with `last_success` (ISO UTC).
+5. **Handoff** — `science_processor.py` extracts green channel →
+   `*_Green.fits` for aperture photometry.
+
+---
+
+## ⚠️ VETO LOGIC (ANY STATE)
+
+If any of these conditions occur, transition to **PARKED** immediately
+and alert via notifier:
+
+| Condition | Source | Threshold | Action |
+|-----------|--------|-----------|--------|
+| Low battery | `get_device_state` result | `battery_capacity < 10%` | Park + alert |
+| Overheating | `get_device_state` result | `temp > 55.0°C` | Park + alert |
+| Heartbeat lost | port 4700 TCP | No response > 10s | Park + alert |
+| Dawn | Sun altitude | `>= -18.0°` | Postflight transition |
+| Weather | `data/weather_state.json` | clouds > 70% or humidity > 90% | Postflight + alert |
+
+Battery and temperature are readable from the `get_device_state`
+response payload. Poll once per target cycle — not per frame.

@@ -1,4 +1,26 @@
-# Objective: Master vocabulary translating standard Alpaca commands to ZWO proprietary methods.
+# SEEVAR_DICT.PSV — Sovereign Method Vocabulary
+# Version: 2026.03 (annotated)
+# Path: logic/SEEVAR_DICT.PSV
+#
+# Empirical vocabulary dump from seestar_alp bridge testing (Kriel era).
+# All entries were verified against the Alpaca /1/command wrapper on
+# port 5432 (bridge path). Method names are still valid on sovereign
+# TCP port 4700 — only the transport layer changed.
+#
+# Reading guide:
+#   Endpoint_Payload  — the Alpaca wrapper form used during testing
+#   Expected_Response — observed JSON response (truncated with ...)
+#
+# CONFIRMED for sovereign TCP (port 4700, JSON-RPC):
+#   get_device_state, iscope_stop_view, iscope_start_view,
+#   scope_sync, scope_goto, scope_park, set_control_value,
+#   set_setting, start_solve, get_solve_result, start_auto_focuse
+#
+# NOT CONFIRMED / DO NOT USE in sovereign path:
+#   start_exposure, get_last_image, get_stacked_img,
+#   iscope_get_app_state, method_sync
+#
+# Full confirmed method list: logic/API_PROTOCOL.MD
 Category|Command|Endpoint_Payload|Expected_Response
 Seestar Alpaca API|Action Method_Sync|/1/command command=scope_sync|{"ServerTransactionID": 82899, "ClientTransactionID": 1, "Value": {"1"...
 Seestar Alpaca API|Action Method_Async|/1/command command=get_focuser_position|1307...

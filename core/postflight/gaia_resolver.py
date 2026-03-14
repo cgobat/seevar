@@ -35,6 +35,12 @@ GRID_DEG       = 0.1
 # Faint limit — no point fetching stars the IMX585 cannot measure cleanly
 GMAG_FAINT     = 14.5
 
+# Bright limit — stars brighter than this saturate or go non-linear on IMX585
+GMAG_BRIGHT    = 9.5
+
+# Magnitude window half-width around target — only use comps within this range
+MAG_WINDOW     = 3.0
+
 # Minimum stars required before we consider the cache valid
 MIN_STARS      = 5
 
@@ -95,7 +101,7 @@ def _query_vizier(ra: float, dec: float) -> list:
 
     logger.info("Querying Gaia DR3 via VizieR at RA=%.4f Dec=%.4f ...", ra, dec)
 
-    v = Vizier(columns=GAIA_COLUMNS, column_filters={"Gmag": f"<{GMAG_FAINT}"})
+    v = Vizier(columns=GAIA_COLUMNS, column_filters={"Gmag": f">{GMAG_BRIGHT} & <{GMAG_FAINT}"})
     v.ROW_LIMIT = -1
 
     coord  = SkyCoord(ra=ra, dec=dec, unit=("deg", "deg"), frame="icrs")
@@ -147,7 +153,24 @@ def _query_vizier(ra: float, dec: float) -> list:
 # Public API
 # ---------------------------------------------------------------------------
 
-def get_comp_stars(ra: float, dec: float, force_refresh: bool = False) -> list:
+def _apply_mag_window(stars: list, target_mag: float = None) -> list:
+    """
+    Filter comp stars to a sensible magnitude window.
+    Always enforces GMAG_BRIGHT floor (IMX585 saturation limit).
+    If target_mag provided, also applies MAG_WINDOW around target.
+    """
+    if target_mag is not None:
+        lo = max(GMAG_BRIGHT, target_mag - MAG_WINDOW)
+        hi = min(GMAG_FAINT,  target_mag + MAG_WINDOW)
+    else:
+        lo = GMAG_BRIGHT
+        hi = GMAG_FAINT
+
+    filtered = [s for s in stars if lo <= s.get("v_mag", 99) <= hi]
+    return filtered
+
+
+def get_comp_stars(ra: float, dec: float, force_refresh: bool = False, target_mag: float = None) -> list:
     """
     Return a list of comparison stars for the field centred on ra/dec.
 
@@ -168,7 +191,8 @@ def get_comp_stars(ra: float, dec: float, force_refresh: bool = False) -> list:
                 data = json.load(f)
             stars = data.get("stars", [])
             if len(stars) >= MIN_STARS:
-                logger.info("Gaia cache hit: %s (%d stars)", cache.name, len(stars))
+                stars = _apply_mag_window(stars, target_mag)
+                logger.info("Gaia cache hit: %s (%d stars after window filter)", cache.name, len(stars))
                 return stars
             else:
                 logger.warning("Cache exists but only %d stars — refreshing.", len(stars))
@@ -194,6 +218,7 @@ def get_comp_stars(ra: float, dec: float, force_refresh: bool = False) -> list:
     else:
         logger.error("Insufficient stars returned (%d < %d). Cache not written.", len(stars), MIN_STARS)
 
+    stars = _apply_mag_window(stars, target_mag)
     return stars
 
 

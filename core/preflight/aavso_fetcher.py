@@ -99,6 +99,18 @@ def haul_and_filter(api_key):
                     "duration": 600
                 })
 
+        # spam_dedup — AAVSO API returns same target once per campaign
+        # section when obs_section="all". Deduplicate by name, last-wins.
+        # Also normalise V0### → V### to match VSX canonical names.
+        import re
+        seen = {}
+        for t in targets:
+            canon = re.sub(r'V0+(\d)', r'V', t['name'])
+            t['name'] = canon
+            seen[canon] = t
+        targets = list(seen.values())
+        logger.info(f"  → After dedup + name normalisation: {len(targets)} unique targets")
+
         output_data = {
             "#objective": "Master haul of AAVSO targets filtered by local horizon and assigned CADENCE.md rules.",
             "metadata": {

@@ -48,6 +48,7 @@ class CalibrationEngine:
         target_name: str = "",
         channel:     str = SCIENCE_CHANNEL,
         force_gaia_refresh: bool = False,
+        target_mag:  float = None,
     ) -> dict:
         """
         Full pipeline for one frame:
@@ -72,7 +73,7 @@ class CalibrationEngine:
                     fits_path.name, target_name or "unnamed", channel)
 
         # 2 — Gaia comp stars for this field
-        comp_stars = get_comp_stars(target_ra, target_dec, force_refresh=force_gaia_refresh)
+        comp_stars = get_comp_stars(target_ra, target_dec, force_refresh=force_gaia_refresh, target_mag=target_mag)
         if len(comp_stars) < MIN_COMPS:
             return {"error": f"insufficient_comp_stars: got {len(comp_stars)}, need {MIN_COMPS}"}
 

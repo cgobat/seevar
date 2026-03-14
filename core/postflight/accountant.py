@@ -49,6 +49,8 @@ DATA_DIR     = PROJECT_ROOT / "data"
 LOCAL_BUFFER = DATA_DIR / "local_buffer"
 ARCHIVE_DIR  = DATA_DIR / "archive"
 LEDGER_FILE  = DATA_DIR / "ledger.json"
+PLAN_FILE        = DATA_DIR / "tonights_plan.json"
+VSX_CATALOG_FILE = DATA_DIR / "vsx_catalog.json"
 
 # Minimum SNR gate — below this, observation is flagged FAILED_QC_LOW_SNR
 MIN_SNR = 5.0
@@ -169,6 +171,57 @@ def process_buffer():
 
     processed = successes = 0
 
+    # mag_lookup — three-source priority chain for comp star window
+    # 1. VSX mag_mid  — midpoint of amplitude range, best for Miras/LPVs
+    # 2. Plan mag_max — fallback for targets not in VSX
+    # 3. Ledger last_mag — fallback for previously observed targets
+    mag_lookup = {}
+
+    # Source 1: VSX catalog mag_mid
+    if VSX_CATALOG_FILE.exists():
+        try:
+            vsx_data  = json.load(open(VSX_CATALOG_FILE))
+            vsx_stars = vsx_data.get("stars", {})
+            for name, star in vsx_stars.items():
+                mid = star.get("mag_mid")
+                if mid is not None:
+                    try:
+                        mag_lookup[name] = float(mid)
+                    except (TypeError, ValueError):
+                        pass
+            log.info("VSX mag_mid loaded: %d targets", len(mag_lookup))
+        except Exception as e:
+            log.warning("VSX mag lookup failed: %s", e)
+
+    # Source 2: Plan mag_max — fills gaps where VSX has no mag_mid
+    if PLAN_FILE.exists():
+        try:
+            plan_data = json.load(open(PLAN_FILE))
+            added = 0
+            for t in plan_data.get("targets", []):
+                name = t.get("name", "")
+                if name and name not in mag_lookup:
+                    mag = t.get("mag_max")
+                    if mag is not None:
+                        try:
+                            mag_lookup[name] = float(mag)
+                            added += 1
+                        except (TypeError, ValueError):
+                            pass
+            log.info("Plan mag_max added: %d additional targets", added)
+        except Exception as e:
+            log.warning("Plan mag lookup failed: %s", e)
+
+    # Source 3: Ledger last_mag — fills gaps for previously observed targets
+    for name, entry in ledger.items():
+        if name not in mag_lookup:
+            last = entry.get("last_mag")
+            if last is not None:
+                try:
+                    mag_lookup[name] = float(last)
+                except (TypeError, ValueError):
+                    pass
+
     for fpath in fits_files:
         log.info("Processing: %s", fpath.name)
 
@@ -196,7 +249,8 @@ def process_buffer():
             continue
 
         # --- Run full Bayer differential photometry ---
-        result = _engine.calibrate(str(fpath), ra_deg, dec_deg, target_name)
+        target_mag = mag_lookup.get(target_name)
+        result = _engine.calibrate(str(fpath), ra_deg, dec_deg, target_name, target_mag=target_mag)
 
         # Ensure UTC Z suffix
         if date_obs and not str(date_obs).endswith("Z"):

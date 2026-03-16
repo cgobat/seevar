@@ -114,3 +114,4 @@ logs/
 config.toml
 *.pyc
 __pycache__/
+data/

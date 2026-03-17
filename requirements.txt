@@ -56,3 +56,6 @@ python-dateutil==2.9.0.post0
 pytz==2022.7.1
 tzlocal==5.3.1
 tzdata==2025.3
+
+# Clear Outside astronomy weather scraper
+clear-outside-apy>=1.0.0

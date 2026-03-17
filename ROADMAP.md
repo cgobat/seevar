@@ -1,7 +1,7 @@
 🗺️ S30-PRO Development Roadmap: The Rommeldam Epic
 
 > **Objective:** Tracks the architectural journey and future versioning milestones of the Seestar Federation, mapped to the characters of Marten Toonder's universe.
-> **Version:** 1.2.0 (Garmt / Pee Pastinakel)
+> **Version:** 1.3.0 (Oene — Clean Slate)
 
 This document outlines the architectural journey of the S30-PRO autonomous observatory, structurally mapped to the characters of Marten Toonder's universe.
 
@@ -18,38 +18,46 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
 * **v0.9 Terpen Tijn:** "Het is prut!" Westward priority active. Sub-pixel centroiding, dynamic CFA debayering, and stable Alpaca handshake for AAVSO targets.
 * **v1.0 Kwetal:** Converting the Orchestrator into a bulletproof `systemd` background daemon.
 * **v1.1 Pee Pastinakel:** Dynamic aperture scaling (PSF fitting) and saturation detection.
-
-## 🚀 Near-Term Milestones (The Specialists)
-* **v1.2 Garmt (Current):** Unified PEP 257 standardization across the entire fleet. Implementation of the "Standardization Reaper" and full-sentence objective integration to prevent AI tripping.
+* **v1.2 Garmt:** Unified PEP 257 standardization. "Standardization Reaper" and full-sentence objective integration.
+* **v1.3 Monkel:** The Discovery Phase. Daemon interruption fixes and Ziggo-subnet home/field detection.
+* **v1.4 Kriel:** gpsd integration, dynamic 6-char Maidenhead. Alpaca communication centralization. Sovereign TCP path established.
+* **v1.5 Humpie:** Storage and wear strategy. OS on SD, app and data on RAID1 USB array, live state in RAM (/dev/shm), NAS failover via rsync.
+* **v1.6 Jochem:** Giving the background workers a bigger role. Cadence filter, ledger_manager, fleet_mapper sovereign TCP, full simulation end-to-end confirmed S1–S7 and T1–T7.
+* **v1.7 Oene:** **The Clean Slate Milestone (March 2026).** Full reinstallation verified on fresh Bookworm SD card.
+  - bootstrap.sh v1.2.1 — single `bash <(curl ...)` install, .venv, telescope questionnaire, auto-start services
+  - config.toml.example v2.0.0 — all sections complete, maidenhead-based NAS detection
+  - INSTALL.md — tester-facing installation guide
+  - AAVSO Extended Format reporter v1.2.0 — full 15-field format, WebObs 2.0 preview tested
+  - JD header added to sovereign_stamp in pilot.py
+  - BRIDGE LED removed from dashboard (ALP retired)
+  - Flat horizon mask (15° all-round) seeded at install — replaced at first light
+  - README.md beta notice and curl one-liner
+  - Seed catalog: 442 targets + reference stars (40°–60°N)
+  - Testers: Arenda (tester #1), SD card ready
 
 ---
 
 ## 🌲 Epoch 1: Het Kleine Volkje (v1.x)
 *The invisible, tireless workers in the background. Focuses on system resilience and background magic.*
-* **v1.1 Pee Pastinakel:** "Talks to the plants" (environmental sensor tuning).
-* **v1.2 Garmt:** A down-to-earth, stable baseline update. Standardized project-metadata and objective clarity.
-* **v1.3 Monkel:** *"Een mens kan ook nooit eens rustig..."* **The Discovery Phase.** Fixing daemon interruption bugs and implementing the Ziggo-subnet home/field detection.
-* **v1.4 Kriel:** Integration of `gpsd` for dynamic 6-char Maidenhead updates in-memory.
-     -  Alpaca Communication Centralization (Revision v1.4.x)
-     -  Objective: Eliminate Alpaca bridge desynchronization and "Action Rejected" errors caused by inconsistent connection parameters.
-     - Action: Migrate hardcoded BASE_URL and port definitions (5432 vs. 5555) from individual flight scripts into a centralized manager like vault_manager.py or env_loader.py.
-     - Standardization: Enforce a persistent ClientID and a globally managed ClientTransactionID across all "Muscle" scripts to ensure the Alpaca bridge maintains a single, coherent state during asynchronous science blocks.
-* **v1.5 Humpie:** Storage and wear : 
-    - The OS: Stays on the SD card (Read-Only where possible).
-    - The App & Data: Lives on the RAID1 USB Array (/mnt/federation_data).
-    - The Temporary "Live" State: Stays in RAM (/dev/shm).
-    - The Failover: If the NAS is reachable and has >15% free space, the "Accountant" (Post-flight) rsyncs the FITS files there at the end of the night.
-* [x] **v1.6 Jochem:** Giving the background workers a bigger role.
-* **v1.7 Oene:** **The Clean Slate Milestone (March 15).** Full reinstallation on a fresh SD card to verify dependency and systemd integrity.
-    - core/preflight/catalog_localiser.py ( checks latitude and pulls extra object and reference-charts )
-* **v1.8 Snotolf:** An authentic, slightly spicy underlying system change.
-* **v1.9 Fliep:** **The Deployment Master.** Goal: Seamless installation via `git clone` and a finalized `setup_wizard.py`.
+
+* **v1.8 Snotolf:** **The Horizon Mapper.** An authentic, slightly spicy underlying system change.
+  - Camera-based automatic horizon profiling at first light
+  - S30-Pro pans 360° at low altitude during session init
+  - pilot.py captures frames, skyline extracted per azimuth degree
+  - Writes `data/horizon_mask.json` with `source: camera_scan`
+  - horizon.py picks it up automatically — no user action required
+  - Flat frames pipeline (currently darks only)
+
+* **v1.9 Fliep:** **The Deployment Master.**
+  - `config_wizard.py` — re-runnable interactive config tool using tomli_w
+  - Kiosk display service (Pi 4 — Pi 3 too slow)
+  - `catalog_localiser.py` — latitude check, pulls extra objects and reference charts for tester's sky
 
 ---
 
 ## ☕ Epoch 2: The Women of Rommeldam (v2.x)
 *The caretakers and organizers. Focuses on bringing order, analysis, and presentation to the raw data.*
-* **v2.0 Anne Marie Doddel:** **The Hardened Observatory.** Real-time photometric analysis, hardware hardening, and beautiful AAVSO light-curves.
+* **v2.0 Anne Marie Doddel:** **The Hardened Observatory.** Real-time photometric analysis, hardware hardening, and beautiful AAVSO light-curves. First light with Wilhelmina (S30-Pro, April 2026).
 * **v2.1 Anne-Miebetje:** The classic first sub-version refinement.
 * **v2.2 Wobbe:** A highly stable, technical build.
 * **v2.3 Wolle:** Dedicated to visual graph and plot updates.
@@ -57,7 +65,7 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
 * **v2.5 Prettig:** A major UX and ease-of-use improvement.
 * **v2.6 Zonnetje:** An optimistic feature-release.
 * **v2.7 Agatha:** *(Vrouw Dickerdack)* A more "official" or business-grade build.
-* **v2.8 Georgette:** *(Vrouw Grootgrut)* Heavy focus on new data integration.
+* **v2.8 Georgette:** *(Vrouw Grootgrut)* Heavy focus on new data integration. Anna (S30-Pro #2) joins the federation.
 * **v2.9 Tante Pollewop:** The final loving polish.
 
 ---

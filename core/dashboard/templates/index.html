@@ -2,174 +2,109 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SeeVar Federation Dashboard</title>
     <style>
-        :root {
-            --bg-dark: #111111; --panel-bg: #1a1a1a;
-            --text-muted: #888888; --text-bright: #ffffff;
-            --led-green: #39ff14; --led-orange: #ff9900; 
-            --led-grey: #555555; --led-bluegrey: #4a5a6a;
-            --neon-purple: #E0B0FF; --purple-glow: #BF00FF;
-            --alert-red: #ff3333;
-        }
-        * { box-sizing: border-box; } 
-        body { background-color: var(--bg-dark); color: var(--text-bright); font-family: 'Courier New', Courier, monospace; margin: 0; padding: 10px 20px; overflow-x: hidden; display: flex; flex-direction: column; min-height: 98vh;}
-        .top-bar { display: flex; justify-content: space-between; color: var(--led-green); font-weight: bold; font-size: 0.9em; margin-bottom: 20px; padding: 5px 0; border-bottom: 1px solid #333; }
-        .container { display: flex; gap: 20px; justify-content: space-between; width: 100%; flex: 1;}
-        .panel { flex: 1; background-color: var(--panel-bg); border: 1px solid #333; padding: 20px; min-height: 400px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
-        .panel h2 { color: var(--text-muted); font-size: 0.85em; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; }
-        .flight-window-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #333; font-size: 0.9em; font-weight: bold; }
-        .fw-val { color: #88ccff; letter-spacing: 1px; }
-        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.85em; font-weight: bold; }
-        .label { color: var(--text-muted); width: 45%; }
-        .val { color: var(--text-bright); text-align: left; flex: 1; }
-        .target-card { border-top: 1px dashed #333; padding-top: 15px; margin-top: 15px; }
-        .led { width: 20px; height: 20px; border-radius: 4px; margin-left: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #000; }
-        .green { background-color: var(--led-green); box-shadow: 0 0 8px var(--led-green); }
-        .orange { background-color: var(--led-orange); box-shadow: 0 0 8px var(--led-orange); }
-        .red { background-color: var(--alert-red); box-shadow: 0 0 8px var(--alert-red); }
-        .grey { background-color: var(--led-grey); }
-        .weather-icon { background: none; box-shadow: none; font-size: 18px; color: #fff; }
-        .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80%; text-align: center; }
-        .icon-p { background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; font-size: 3em; font-weight: bold; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }
-        .status-main { color: var(--text-bright); font-size: 2em; letter-spacing: 5px; font-weight: 900; margin-bottom: 10px; }
-        .status-sub { color: var(--text-bright); font-size: 0.9em; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
-        .status-msg { color: var(--text-muted); font-size: 0.8em; font-style: italic; }
-        .pf-scoreboard { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 15px; }
-        .pf-score-cell { text-align: center; }
-        .pf-score-num { font-size: 1.5em; font-weight: 900; letter-spacing: 1px; line-height: 1; }
-        .pf-score-lbl { font-size: 0.6em; color: #555; letter-spacing: 2px; margin-top: 4px; }
-        .s-dim { color: #444; }
-        .s-green { color: var(--led-green); text-shadow: 0 0 8px var(--led-green); }
-        .s-orange { color: var(--led-orange); text-shadow: 0 0 8px var(--led-orange); }
-        .pf-log-head { display: grid; grid-template-columns: 38px 1fr 24px 1fr 54px; gap: 4px; font-size: 0.62em; color: #444; border-bottom: 1px solid #222; padding-bottom: 5px; margin-bottom: 4px; }
-        .pf-log { display: flex; flex-direction: column; gap: 1px; }
-        .pf-entry { display: grid; grid-template-columns: 38px 1fr 24px 1fr 54px; gap: 4px; font-size: 0.72em; padding: 5px 0; border-bottom: 1px solid #1a1a1a; align-items: center; }
-        .flight-log-box { margin-top: 20px; border-top: 1px dashed #333; padding-top: 15px; }
-        .log-container { display: flex; flex-direction: column; gap: 4px; }
-        .log-line { color: var(--text-muted); font-size: 0.9em; white-space: nowrap; }
-        .latest { color: var(--text-bright); font-weight: bold; }
+        :root { --bg: #111; --card: #1a1a1a; --green: #39ff14; --orange: #ff9900; --red: #ff3333; --text: #eee; --muted: #888; }
+        body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; margin: 0; padding: 10px 20px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .top-bar { display: flex; justify-content: space-between; color: var(--green); font-weight: bold; font-size: 0.9em; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .grid { display: flex; gap: 20px; flex: 1; min-height: 0; }
+        .panel { flex: 1; background: var(--card); border: 1px solid #333; padding: 20px; display: flex; flex-direction: column; box-shadow: inset 0 0 20px #000; }
+        .panel h2 { color: var(--muted); font-size: 0.8em; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; margin: 0 0 15px 0; }
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85em; font-weight: bold; }
+        .led { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #000; }
+        .green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+        .red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+        .grey { background: #444; }
+        .icon-p { background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; font-size: 3em; font-weight: bold; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 16px; margin-bottom: 20px; }
+        .pf-scoreboard { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; border-bottom: 1px dashed #333; padding-bottom: 15px; margin-bottom: 15px; }
+        .pf-val { font-size: 1.5em; font-weight: 900; text-align: center; }
+        .pf-lbl { font-size: 0.6em; color: #555; text-align: center; }
+        .log-box { margin-top: 15px; border-top: 1px dashed #333; padding-top: 15px; font-size: 0.85em; color: var(--muted); }
+        .latest { color: #fff; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="top-bar">
-        <span id="telemetry-mh">--</span>
-        <span>JDATE: <span id="live-jdate">--</span></span>
-    </div>
-
-    <div class="container">
+    <div class="top-bar"><span id="tel-mh">--</span><span>JDATE: <span id="live-jd">--</span></span></div>
+    <div class="grid">
         <div class="panel">
             <h2>SYSTEM VITALS</h2>
-            <div class="flight-window-row"><span class="label">FLIGHT WINDOW</span> <span class="fw-val">{{ flight_window }}</span></div>
-            <div class="row"><span class="label">SEESTAR (LINK)</span> <span id="tel-link-val" class="val">WAITING...</span> <div id="tel-link-led" class="led grey"></div></div>
-            <div class="row"><span class="label">GPS (LOCK)</span> <span class="val"></span> <div class="led green"></div></div>
-            <div class="row"><span class="label">WEATHER (PRED)</span> <span id="weather-val" class="val">CLEAR</span> <div id="weather-icon-led" class="led weather-icon">⭐</div></div>
-            
-            <div class="target-card">
-                <div class="row" style="padding-bottom: 5px;"><span class="label">TARGET TELEMETRY</span><div id="target-count-led" class="led orange">00</div></div>
-                <div class="row"><span class="label">NAME</span> <span id="t-name" class="val">FETCHING...</span></div>
-                <div class="row"><span class="label">LOC</span> <span id="t-loc" class="val">-</span></div>
-                <div class="row"><span class="label">MAG</span> <span id="t-mag" class="val">-</span></div>
+            <div class="row"><span style="color:var(--muted)">WINDOW</span><span id="fw-val">{{ flight_window }}</span></div>
+            <div class="row"><span style="color:var(--muted)">SEESTAR</span><div id="link-led" class="led grey"></div></div>
+            <div class="row"><span style="color:var(--muted)">WEATHER</span><span id="wth-t">--</span><div id="wth-i" style="margin-left:10px">❓</div></div>
+            <div class="target-card" style="border-top:1px dashed #333; margin-top:15px; padding-top:15px">
+                <div class="row"><span style="color:var(--muted)">NAME</span><span id="t-name">--</span><div id="t-cnt" class="led orange">00</div></div>
+                <div class="row"><span style="color:var(--muted)">LOC</span><span id="t-loc">--</span></div>
+                <div class="row"><span style="color:var(--muted)">MAG</span><span id="t-mag" style="color:#88ccff">--</span></div>
             </div>
         </div>
-
         <div class="panel">
-            <div class="center-content">
-                <div id="orch-icon" class="icon-p">P</div>
-                <div id="orch-main" class="status-main">PARKED</div>
-                <div id="orch-sub" class="status-sub">OFF-DUTY</div>
-                <div id="orch-msg" class="status-msg">Waiting for orchestrator...</div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                <div class="icon-p">P</div>
+                <div id="f-state" style="font-size:2em; font-weight:900; color:#1e90ff">PARKED</div>
+                <div id="f-sub" style="font-weight:bold; color:var(--muted)">OFF-DUTY</div>
             </div>
-            <div class="row" style="margin-top:auto;"><span class="label">BATTERY</span><span id="v-bat" class="val">--%</span></div>
-            <div class="row"><span class="label">S30 TEMP</span><span id="v-tmp" class="val">--°C</span></div>
-            <div class="row"><span class="label">STORAGE</span><span id="v-store" class="val">-- MB</span></div>
+            <div class="row" style="margin-top:auto"><span style="color:var(--muted)">BATTERY</span><span id="v-bat">--%</span></div>
+            <div class="row"><span style="color:var(--muted)">S30 TEMP</span><span id="v-tmp">--°C</span></div>
+            <div class="row"><span style="color:var(--muted)">STORAGE</span><span id="v-store">-- MB</span></div>
         </div>
-
         <div class="panel">
             <h2>POSTFLIGHT AUDIT</h2>
             <div class="pf-scoreboard">
-                <div class="pf-score-cell"><div class="pf-score-num s-dim" id="pf-sched">--</div><div class="pf-score-lbl">SCHED</div></div>
-                <div class="pf-score-cell"><div class="pf-score-num s-dim" id="pf-attempt">--</div><div class="pf-score-lbl">ATTEMPT</div></div>
-                <div class="pf-score-cell"><div class="pf-score-num s-dim" id="pf-observed">--</div><div class="pf-score-lbl">OBSERVED</div></div>
-                <div class="pf-score-cell"><div class="pf-score-num s-dim" id="pf-failed">--</div><div class="pf-score-lbl">FAILED</div></div>
+                <div><div class="pf-val" id="pf-s">--</div><div class="pf-lbl">SCHED</div></div>
+                <div><div class="pf-val" id="pf-a">--</div><div class="pf-lbl">ATT</div></div>
+                <div><div class="pf-val" id="pf-o" style="color:var(--green)">--</div><div class="pf-lbl">OBS</div></div>
+                <div><div class="pf-val" id="pf-f" style="color:var(--orange)">--</div><div class="pf-lbl">FAIL</div></div>
             </div>
-            <div class="pf-log-head"><span>UTC</span><span>TARGET</span><span>FLT</span><span>MAG / SNR</span><span>ZP</span></div>
-            <div class="pf-log" id="pf-log-body"></div>
-
-            <div class="flight-log-box">
-                <h2>FLIGHT LOG</h2>
-                <div id="flight-log" class="log-container"></div>
-            </div>
+            <div class="row"><span style="color:var(--muted)">PHOTOMETRY</span><div id="led-p" class="led grey"></div></div>
+            <div class="row" style="margin-bottom:20px"><span style="color:var(--muted)">AAVSO READY</span><div id="led-a" class="led grey"></div></div>
+            <div id="pf-list" style="font-size:0.75em; flex:1; overflow-y:auto"></div>
+            <div class="log-box" id="f-log"></div>
         </div>
     </div>
-
     <script>
         const targetData = {{ target_data | tojson | safe }};
         let tickerIndex = 0;
-
         function updateTicker() {
             if (!targetData || targetData.length === 0) return;
             const t = targetData[tickerIndex];
             document.getElementById('t-name').innerText = t.name || t.star_name || "UNKNOWN";
             document.getElementById('t-loc').innerText = `RA: ${t.ra} DEC: ${t.dec}`;
-            document.getElementById('target-count-led').innerText = String(targetData.length).padStart(2, '0');
+            const maxM = t.max_mag != null ? t.max_mag : "--";
+            const minM = t.min_mag != null ? t.min_mag : "--";
+            const perD = t.period_days != null ? (t.period_days < 1 ? (t.period_days * 24).toFixed(1) + "h" : t.period_days.toFixed(1) + "d") : "--";
+            document.getElementById('t-mag').innerText = `${maxM} – ${minM} · ${perD} (V)`;
+            document.getElementById('t-cnt').innerText = String(targetData.length).padStart(2, '0');
             tickerIndex = (tickerIndex + 1) % targetData.length;
         }
-
         function fetchTelemetry() {
-            fetch('/telemetry').then(res => res.json()).then(data => {
-                if(data.maidenhead) document.getElementById('telemetry-mh').innerText = data.maidenhead;
-                
-                if(data.weather) {
-                    document.getElementById('weather-val').innerText = data.weather.status || 'N/A';
-                    document.getElementById('weather-icon-led').innerText = data.weather.icon || '❓';
+            fetch('/telemetry').then(r => r.json()).then(d => {
+                document.getElementById('tel-mh').innerText = d.maidenhead;
+                document.getElementById('wth-t').innerText = d.weather.status;
+                document.getElementById('wth-i').innerText = d.weather.icon;
+                document.getElementById('f-state').innerText = d.orchestrator.state;
+                document.getElementById('f-sub').innerText = d.orchestrator.sub;
+                document.getElementById('v-bat').innerText = d.hardware.battery + "%";
+                document.getElementById('v-tmp').innerText = d.hardware.temp_c + "°C";
+                document.getElementById('v-store').innerText = d.hardware.storage_mb + " MB";
+                document.getElementById('link-led').className = 'led ' + (d.hardware.link_status === "ACTIVE" ? "green" : "red");
+                const sb = d.postflight.scoreboard;
+                document.getElementById('pf-s').innerText = sb.scheduled;
+                document.getElementById('pf-a').innerText = sb.attempted;
+                document.getElementById('pf-obs').innerText = sb.observed;
+                document.getElementById('pf-fail').innerText = sb.failed;
+                document.getElementById('led-p').className = 'led ' + d.postflight.phot_led;
+                document.getElementById('led-a').className = 'led ' + d.postflight.aavso_led;
+                if(d.orchestrator.flight_log) {
+                    const logs = d.orchestrator.flight_log.slice(-5);
+                    document.getElementById('f-log').innerHTML = logs.map((l, i) => `<div class="${i === logs.length-1 ? 'latest' : ''}">${l}</div>`).join('');
                 }
-
-                if(data.orchestrator) {
-                    document.getElementById('orch-main').innerText = data.orchestrator.state || 'PARKED';
-                    document.getElementById('orch-sub').innerText = data.orchestrator.sub || 'OFF-DUTY';
-                    document.getElementById('orch-msg').innerText = data.orchestrator.msg || '';
-                    if(data.orchestrator.flight_log) {
-                        const logs = data.orchestrator.flight_log.slice(-5);
-                        document.getElementById('flight-log').innerHTML = logs.map((l, i) => 
-                            `<div class="log-line ${i === logs.length-1 ? 'latest' : ''}">${l}</div>`
-                        ).join('');
-                    }
-                }
-
-                if(data.hardware) {
-                    document.getElementById('v-bat').innerText = data.hardware.battery + "%";
-                    document.getElementById('v-tmp').innerText = data.hardware.temp_c + "°C";
-                    document.getElementById('v-store').innerText = data.hardware.storage_mb + " MB";
-                    document.getElementById('tel-link-led').className = 'led ' + (data.hardware.link_status === "ACTIVE" ? "green" : "red");
-                    document.getElementById('tel-link-val').innerText = data.hardware.link_status === "ACTIVE" ? "ACTIVE" : "OFFLINE";
-                }
-
-                if(data.postflight) {
-                    const sb = data.postflight.scoreboard;
-                    document.getElementById('pf-sched').innerText = sb.scheduled;
-                    document.getElementById('pf-attempt').innerText = sb.attempted;
-                    document.getElementById('pf-attempt').className = 'pf-score-num' + (sb.attempted > 0 ? ' s-green' : ' s-dim');
-                    document.getElementById('pf-observed').innerText = sb.observed;
-                    document.getElementById('pf-observed').className = 'pf-score-num' + (sb.observed > 0 ? ' s-green' : ' s-dim');
-                    document.getElementById('pf-failed').innerText = sb.failed;
-                    document.getElementById('pf-failed').className = 'pf-score-num' + (sb.failed > 0 ? ' s-orange' : ' s-dim');
-                    if(data.postflight.log) {
-                        document.getElementById('pf-log-body').innerHTML = data.postflight.log.map(r => 
-                            `<div class="pf-entry"><span>${r.time}</span><span>${r.name}</span><span>${r.filter}</span><span>${r.mag_str} / ${r.snr_str}</span><span>${r.zp_str}</span></div>`
-                        ).join('');
-                    }
-                }
-            }).catch(err => console.error("Telemetry error:", err));
+                document.getElementById('pf-list').innerHTML = d.postflight.log.map(r => 
+                    `<div style="display:flex; justify-content:space-between; border-bottom:1px solid #222; padding:4px 0"><span>${r.time}</span><span>${r.name}</span><span style="color:var(--green)">${r.mag}</span></div>`).join('');
+            });
         }
-
-        setInterval(updateTicker, 4000);
-        setInterval(fetchTelemetry, 2000);
-        setInterval(() => {
-            const jd = (new Date().getTime() / 86400000) + 2440587.5;
-            document.getElementById('live-jdate').innerText = jd.toFixed(4);
-        }, 1000);
+        setInterval(updateTicker, 4000); setInterval(fetchTelemetry, 2000);
+        setInterval(() => { document.getElementById('live-jd').innerText = ((new Date().getTime() / 86400000) + 2440587.5).toFixed(4); }, 1000);
         updateTicker(); fetchTelemetry();
     </script>
 </body>

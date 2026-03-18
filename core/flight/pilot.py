@@ -33,6 +33,7 @@ from typing import Any, Optional
 
 import numpy as np
 import requests
+from astropy.io import fits
 from astropy.coordinates import EarthLocation, AltAz, SkyCoord, get_body
 from astropy.io import fits
 from astropy.time import Time
@@ -667,19 +668,14 @@ def sovereign_stamp(
             sun = get_body("sun", t_astropy, location)
             sep = moon.separation(sun).deg
             moon_phase = round(min(max((1.0 - math.cos(math.radians(sep))) / 2.0, 0.0), 1.0), 4)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("sovereign_stamp: moon calculation failed: %s", e)
 
+    # --- Assemble header -----------------------------------------------------
     h = {
-        "SIMPLE": True,
-        "BITPIX": 16,
-        "NAXIS": 2,
-        "NAXIS1": width,
-        "NAXIS2": height,
-        "BZERO": 32768.0,
-        "BSCALE": 1.0,
-        "OBJECT": target.name,
-        "OBJCTRA": _hours_to_hms(target.ra_hours),
+        # --- Target identity ---
+        "OBJECT":   target.name,
+        "OBJCTRA":  _hours_to_hms(target.ra_hours),
         "OBJCTDEC": _deg_to_dms(target.dec_deg),
         "RA": ra_deg,
         "DEC": target.dec_deg,
@@ -736,46 +732,14 @@ def write_fits(array: np.ndarray, header_dict: dict, output_path: Path) -> bool:
         array, header_dict, output_path = header_dict, output_path, array
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    header = fits.Header()
+    header.update(header_dict)
 
-    if array.dtype != np.uint16:
-        array = np.clip(array, 0, 65535).astype(np.uint16)
-    array_signed = (array.astype(np.int32) - 32768).astype(np.int16)
-    if array_signed.dtype.byteorder not in (">",):
-        array_signed = array_signed.byteswap().view(array_signed.dtype.newbyteorder(">"))
-
-    def card(key: str, value, comment: str = "") -> str:
-        key = key.upper()[:8].ljust(8)
-        if isinstance(value, bool):
-            val_str = f"{'T' if value else 'F':>20}"
-        elif isinstance(value, int):
-            val_str = f"{value:>20}"
-        elif isinstance(value, float):
-            val_str = f"{value:>20.10G}"
-        elif isinstance(value, str):
-            val_str = f"'{value.replace(chr(39), chr(39) * 2):<8}'".ljust(20)
-        else:
-            val_str = f"'{str(value):<8}'".ljust(20)
-        return f"{key}= {val_str}{f' / {comment}' if comment else ''}"[:80].ljust(80)
-
-    priority_keys = ["SIMPLE", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "BZERO", "BSCALE"]
-    records = [card(k, header_dict[k]) for k in priority_keys if k in header_dict]
-    records += [card(k, v) for k, v in header_dict.items() if k not in priority_keys]
-    records.append("COMMENT   SeeVar v3.1.0 -- Alpaca REST -- BZERO Signed-Integer Protected".ljust(80))
-    records.append("END".ljust(80))
-
-    while (len(records) * 80) % 2880 != 0:
-        records.append(" " * 80)
-
-    header_bytes = "".join(records).encode("ascii")
-    data_bytes = array_signed.tobytes()
-    remainder = len(data_bytes) % 2880
-    if remainder:
-        data_bytes += b"\x00" * (2880 - remainder)
+    hdu = fits.PrimaryHDU(data=array.astype(np.uint16), header=header)
 
     try:
-        with open(output_path, "wb") as f:
-            f.write(header_bytes)
-            f.write(data_bytes)
+        hdu.writeto(output_path, overwrite=True)
         return True
     except OSError:
         return False

@@ -679,14 +679,7 @@ def sovereign_stamp(
         "OBJCTDEC": _deg_to_dms(target.dec_deg),
         "RA": ra_deg,
         "DEC": target.dec_deg,
-        "CRVAL1": ra_deg,
-        "CRVAL2": target.dec_deg,
-        "CRPIX1": width / 2.0,
-        "CRPIX2": height / 2.0,
-        "CDELT1": -0.001042,
-        "CDELT2": 0.001042,
-        "CTYPE1": "RA---TAN",
-        "CTYPE2": "DEC--TAN",
+        # --- Timing ---
         "DATE-OBS": t_astropy.isot,         # ISO 8601 format
         "MJD-OBS":  t_astropy.mjd,          # Modified Julian Date
         "JD":       round(t_astropy.jd, 6), # Julian Date

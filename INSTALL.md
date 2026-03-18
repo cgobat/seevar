@@ -47,21 +47,40 @@ Wait ~60 seconds for first boot, then:
 
 ```bash
 ssh <username>@<hostname>.local
-Step 3 — Enable passwordless sudoBootstrap requires passwordless sudo for system package installation.Bashecho "$(whoami) ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/seevar
-Step 4 — Run bootstrapBashcurl -fsSL [https://raw.githubusercontent.com/edjuh/seevar/main/bootstrap.sh](https://raw.githubusercontent.com/edjuh/seevar/main/bootstrap.sh) | bash
+
+---
+
+## Step 3 — Enable passwordless sudoBootstrap requires passwordless sudo for system package installation.Bashecho "$(whoami) ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/seevar
+
+---
+
+## Step 4 — Run bootstrapBashcurl -fsSL [https://raw.githubusercontent.com/edjuh/seevar/main/bootstrap.sh](https://raw.githubusercontent.com/edjuh/seevar/main/bootstrap.sh) | bash
 Or if you prefer to inspect it first:Bashwget [https://raw.githubusercontent.com/edjuh/seevar/main/bootstrap.sh](https://raw.githubusercontent.com/edjuh/seevar/main/bootstrap.sh)
 less bootstrap.sh
 bash bootstrap.sh
-Bootstrap will:Install system packages via aptClone the repository to ~/seevarCreate a Python virtual environment at ~/seevar/.venvInstall all Python dependenciesRun the telescope questionnaire — model, name, IPRun the site questionnaire — AAVSO credentials, location, optional Telegram and NASCreate the data directory structure and seed empty state filesInstall and enable the four user-level systemd services (Dashboard, Orchestrator, Weather, GPS)Run a sanity checkPrint a summaryTotal time: approximately 10–15 minutes on a Pi 5, longer on a Pi 4(Python dependency build includes compiled packages).Step 5 — Set telescope IPOnce your telescope is on the network, find its IP address in the Seestar appor your router's DHCP table. Then edit config.toml:Ini, TOML[[seestars]]
-name  = "Wilhelmina"
-model = "S30-Pro"
-ip    = "192.168.1.x"     # ← set this
-mount = "altaz"
+Bootstrap will:Install system packages via aptClone the repository to ~/seevarCreate a Python virtual environment at ~/seevar/.venvInstall all Python dependenciesRun the telescope questionnaire — model, name, IPRun the site questionnaire — AAVSO credentials, location, optional Telegram and NASCreate the data directory structure and seed empty state filesInstall and enable the four user-level systemd services (Dashboard, Orchestrator, Weather, GPS)Run a sanity checkPrint a summaryTotal time: approximately 10–15 minutes on a Pi 5, longer on a Pi 4(Python dependency build includes compiled packages).
+
+---
+
+## Step 5 — Set telescope IPOnce your telescope is on the network, find its IP address in the Seestar appor your router's DHCP table. Then edit config.toml:Ini, TOML[[seestars]]
+
+|----------------------------------------|
+| name  = "Metius"|
+| model = "S30-Pro"|
+| ip    = "192.168.1.x"     # ← set this |
+| mount = "altaz"|
+
 Then regenerate the fleet schema:Bashcd ~/seevar
 python3 core/hardware/fleet_mapper.py
-Step 6 — Run chart_fetcher overnightThe seed catalog bundled with SeeVar contains 442 targets and reference starsfor 40°–60°N. It is sufficient to start observing immediately.To refresh or expand the catalog, run the chart fetcher once.This is a slow process (~3.14m/query) due to AAVSO API throttling !!! — run it overnight:Bashcd ~/seevar
+
+---
+
+## Step 6 — Run chart_fetcher overnightThe seed catalog bundled with SeeVar contains 442 targets and reference starsfor 40°–60°N. It is sufficient to start observing immediately.To refresh or expand the catalog, run the chart fetcher once.This is a slow process (~3.14m/query) due to AAVSO API throttling !!! — run it overnight:Bashcd ~/seevar
 python3 core/preflight/chart_fetcher.py
-Step 7 — Managing the observatorySeeVar runs as user-level systemd services. Use the --user flag to manage them:Bashsystemctl --user status seevar-orchestrator
+
+---
+
+## Step 7 — Managing the observatorySeeVar runs as user-level systemd services. Use the --user flag to manage them:Bashsystemctl --user status seevar-orchestrator
 systemctl --user stop seevar-weather
 systemctl --user restart seevar-dashboard
 Dashboard: http://<hostname>.local:5050Astrometry.net index filesPlate solving requires index files matched to your telescope's field of view.These are not included in the repository.ModelFOVRecommended index filesS30~4.5°index-4107 to index-4110S30-Pro~4.0°index-4107 to index-4110S50~2.5°index-4108 to index-4111Install via apt:Bashsudo apt install astrometry-data-tycho2-10-19

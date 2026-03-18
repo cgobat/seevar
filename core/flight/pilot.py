@@ -420,7 +420,9 @@ def sovereign_stamp(
         "CTYPE1":   "RA---TAN",
         "CTYPE2":   "DEC--TAN",
         # --- Timing ---
-        "DATE-OBS": utc_obs.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3],
+        "DATE-OBS": t_astropy.isot,         # ISO 8601 format
+        "MJD-OBS":  t_astropy.mjd,          # Modified Julian Date
+        "JD":       round(t_astropy.jd, 6), # Julian Date
         "EXPTIME":  target.exp_ms / 1000.0,
         # --- Instrument ---
         "INSTRUME": INSTRUMENT,
@@ -457,10 +459,6 @@ def sovereign_stamp(
 
     if target.auid:
         h["AUID"] = target.auid
-
-    # JD — Julian Date of exposure start.
-    # Explicit key for AAVSO photometry tools and reporter cross-reference.
-    h["JD"] = round(t_astropy.jd, 6)
 
     return h
 

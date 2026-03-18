@@ -410,15 +410,6 @@ def sovereign_stamp(
         "OBJECT":   target.name,
         "OBJCTRA":  _hours_to_hms(target.ra_hours),
         "OBJCTDEC": _deg_to_dms(target.dec_deg),
-        # --- WCS ---
-        "CRVAL1":   ra_deg,
-        "CRVAL2":   target.dec_deg,
-        "CRPIX1":   width  / 2.0,
-        "CRPIX2":   height / 2.0,
-        "CDELT1":   -0.001042,
-        "CDELT2":    0.001042,
-        "CTYPE1":   "RA---TAN",
-        "CTYPE2":   "DEC--TAN",
         # --- Timing ---
         "DATE-OBS": t_astropy.isot,         # ISO 8601 format
         "MJD-OBS":  t_astropy.mjd,          # Modified Julian Date

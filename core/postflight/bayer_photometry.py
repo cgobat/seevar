@@ -28,11 +28,6 @@ from astropy.wcs import WCS
 
 logger = logging.getLogger("seevar.bayer_photometry")
 
-# IMX585 Bayer pattern — GRBG
-# Row Even: G, R, G, R  (col 0,1,2,3...)
-# Row Odd:  B, G, B, G
-BAYER_PATTERN = "GRBG"
-
 # Default aperture geometry (pixels) — used as fallback if PSF fit fails
 R_AP_DEFAULT      = 8
 R_SKY_IN_DEFAULT  = 12
@@ -112,6 +107,7 @@ class BayerFITS:
         self.header: fits.Header          = None
         self.array:  Optional[np.ndarray] = None
         self._wcs:   WCS                  = None
+        self.bayer_pattern: str           = None
 
     def load(self) -> bool:
         try:
@@ -124,6 +120,12 @@ class BayerFITS:
         self.header = hdu.header
         self.array = hdu.data
         self._wcs = WCS(hdu.header)
+
+        self.bayer_pattern = self.header.get("BAYERPAT", "GRBG")
+        # For IMX585 (S30 Pro), we expect GRBG, which looks like
+        # Even rows: G, R, G, R  (col 0,1,2,3...)
+        # Odd rows:  B, G, B, G
+
         return True
 
     def world_to_pixel(self, ra: float, dec: float) -> Tuple[int, int]:

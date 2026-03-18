@@ -2,11 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/preflight/aavso_fetcher.py
-Version: 1.6.0  # SeeVar-v1.6.0-header
-Objective: Step 1 - Haul scientific targets from AAVSO Target Tool API
-           and append strict CADENCE.md sampling rules.
-
-Based on v12.2.0 which worked. Added CV/UG/UGSS/RR/ZAND/Nova types.
+Version: 1.6.1
+Objective: Step 1 - Haul scientific targets from AAVSO Target Tool API and append strict CADENCE.md sampling rules.
 """
 
 import json
@@ -16,6 +13,7 @@ import logging
 import tomllib
 from datetime import datetime
 from pathlib import Path
+import re
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 logger = logging.getLogger("AAVSO_Step1")
@@ -38,77 +36,53 @@ def get_aavso_key():
         sys.exit(1)
 
 def haul_and_filter(api_key):
-    logger.info("📡 STEP 1: Hauling Master Target List from AAVSO Target Tool...")
-    CATALOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    url = "https://targettool.aavso.org/TargetTool/api/v1/targets"
-
+    logger.info("📡 STEP 1: Connecting to AAVSO Target API...")
+    url = f"https://filter.aavso.org/api/v1/targets?apikey={api_key}&obs_section=all"
+    
     try:
-        res = requests.get(url, auth=(api_key, "api_token"), params={"obs_section": "all"}, timeout=30)
-        res.raise_for_status()
-        raw_targets = res.json().get("targets", [])
-        logger.info(f"  → Retrieved {len(raw_targets)} raw targets from Target Tool")
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        raw_targets = response.json()
+        logger.info(f"📥 Retrieved {len(raw_targets)} raw targets.")
 
         targets = []
-        valid_types = ["M", "SR", "LPV", "CV", "UG", "UGSS", "RR", "ZAND", "NA", "NB", "NC", "NR"]
-
         for t in raw_targets:
-            star_name = t.get("star_name", "").strip()
-            if not star_name:
+            try:
+                mag = float(t.get('max_mag', 0))
+            except (ValueError, TypeError):
+                continue
+                
+            if mag > MAG_LIMIT:
+                continue
+                
+            if float(t.get('dec', -90)) < MIN_DEC:
                 continue
 
-            star_type = t.get("var_type", "").upper()
-            is_valid = any(vt in star_type for vt in valid_types)
+            var_type = str(t.get('type', '')).upper()
+            
+            # Match DAILY_TYPES from ledger_manager.py
+            if any(x in var_type for x in ['CV', 'UG', 'UGSS', 'RR', 'NA', 'NB', 'NC', 'NR', 'ZAND']):
+                rec_cadence = 1
+            else:
+                rec_cadence = 3
 
-            try:
-                mag = float(t.get("max_mag", 99.0))
-            except (ValueError, TypeError):
-                mag = 99.0
-            try:
-                min_mag = float(t.get("min_mag", 99.0))
-            except (ValueError, TypeError):
-                min_mag = None
+            targets.append({
+                "name": t['name'],
+                "ra": float(t['ra']),
+                "dec": float(t['dec']),
+                "type": var_type,
+                "max_mag": mag,
+                "recommended_cadence_days": rec_cadence,
+                "priority": 2,
+                "duration": 600
+            })
 
-            try:
-                dec = float(t.get("dec", -90.0))
-            except (ValueError, TypeError):
-                dec = -90.0
-
-            if is_valid and mag <= MAG_LIMIT and dec >= MIN_DEC:
-                vt = star_type
-                if any(x in vt for x in ["CV", "UG", "RR", "NA", "NB", "NC", "NR"]):
-                    rec_cadence = 1
-                elif "SR" in vt:
-                    rec_cadence = 5
-                elif "ZAND" in vt:
-                    rec_cadence = 5
-                elif "M" in vt or "LPV" in vt:
-                    rec_cadence = 10
-                else:
-                    rec_cadence = 3
-
-                targets.append({
-                    "name": star_name,
-                    "auid": t.get("auid", ""),  # SeeVar-auid-field
-                    "ra": t.get("ra", 0.0),
-                    "dec": dec,
-                    "type": star_type,
-                    "mag_max": mag,
-                    "min_mag": min_mag,
-                    "recommended_cadence_days": rec_cadence,
-                    "priority": 2,
-                    "duration": 600
-                })
-
-        # spam_dedup — AAVSO API returns same target once per campaign
-        # section when obs_section="all". Deduplicate by name, last-wins.
-        # Also normalise V0### → V### to match VSX canonical names.
-        import re
         seen = {}
         for t in targets:
-            canon = re.sub(r'V0+(\d)', r'V', t['name'])
+            canon = re.sub(r' V0+(\d)', r'V \1', t['name'])
             t['name'] = canon
             seen[canon] = t
+            
         targets = list(seen.values())
         logger.info(f"  → After dedup + name normalisation: {len(targets)} unique targets")
 
@@ -133,6 +107,5 @@ def haul_and_filter(api_key):
         sys.exit(1)
 
 if __name__ == "__main__":
-    auth_key = get_aavso_key()
-    if auth_key:
-        haul_and_filter(auth_key)
+    key = get_aavso_key()
+    haul_and_filter(key)

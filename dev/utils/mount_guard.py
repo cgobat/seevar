@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Filename: /home/ed/seevar/utils/mount_guard.py
-Version: 1.1.0
-Objective: Check if /mnt/raid1 is mounted and /mnt/raid1/data exists.
+Filename: dev/utils/mount_guard.py
+Version: 1.1.1
+Objective: Check if the specified target is mounted and the required data directory exists.
 """
+
 import os
 import sys
+import argparse
 
 def check_mount(mount_point, required_dir):
     # Check if the base RAID is mounted
@@ -18,11 +20,14 @@ def check_mount(mount_point, required_dir):
     return True
 
 if __name__ == "__main__":
-    BASE = "/mnt/raid1"
-    DATA = "/mnt/raid1/data"
-    if check_mount(BASE, DATA):
-        print(f"✅ SeeVar: RAID confirmed and data folder present.")
+    parser = argparse.ArgumentParser(description="SeeVar Mount Guard")
+    parser.add_argument("--base", default="/mnt/raid1", help="Base mount point to verify")
+    parser.add_argument("--data", default="/mnt/raid1/data", help="Required data directory")
+    args = parser.parse_args()
+
+    if check_mount(args.base, args.data):
+        print(f"✅ SeeVar: Mount confirmed and data folder present at {args.base}.")
         sys.exit(0)
     else:
-        print(f"❌ SeeVar: CRITICAL - RAID not mounted or data folder missing.")
+        print(f"❌ SeeVar: CRITICAL - Mount {args.base} not mounted or {args.data} missing.")
         sys.exit(1)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/postflight/aavso_reporter.py
-Version: 1.2.0
+Version: 1.2.1
 Objective: Generate AAVSO Extended Format reports in the dedicated data/reports/
            directory. Full 15-field Extended Format per AAVSO specification.
            Observer code sourced from VaultManager (observer_id key).
@@ -54,6 +54,12 @@ class AAVSOReporter:
                 "AAVSO submissions require a valid observer code."
             )
 
+    def _fmt_num(self, val, places=3) -> str:
+        """Safely format numbers to a specific decimal place, allowing string fallbacks (e.g. '>14.5' or 'na')."""
+        if isinstance(val, (float, int)):
+            return f"{val:.{places}f}"
+        return str(val)
+
     def finalize_report(self, observations: list) -> Path:
         """
         Write AAVSO Extended Format report to data/reports/.
@@ -61,11 +67,11 @@ class AAVSOReporter:
         Each observation dict must contain:
           target  : str  — AAVSO star name
           jd      : float — Julian Date
-          mag     : float — instrumental differential magnitude
-          err     : float — magnitude uncertainty
+          mag     : float|str — instrumental differential magnitude
+          err     : float|str — magnitude uncertainty
           filter  : str  — filter code (CV, V, B, R, I)
           comp    : str  — comparison star label (AAVSO sequence ID)
-          cmag    : float — comparison star catalogue magnitude
+          cmag    : float|str — comparison star catalogue magnitude
           kname   : str  — check star label (or 'na')
           kmag    : float|str — check star magnitude (or 'na')
           amass   : float|str — airmass (or 'na')
@@ -88,34 +94,25 @@ class AAVSOReporter:
 
         rows = []
         for obs in observations:
-            # Airmass and check star are optional — default to na
             amass = obs.get("amass", "na")
             kname = obs.get("kname", "na")
             kmag  = obs.get("kmag",  "na")
             chart = obs.get("chart", "na")
             notes = obs.get("notes", "na")
 
-            # Format airmass to 3dp if numeric
-            if isinstance(amass, float):
-                amass = f"{amass:.3f}"
-
-            # Format kmag to 3dp if numeric
-            if isinstance(kmag, float):
-                kmag = f"{kmag:.3f}"
-
             row = (
                 f"{obs['target']},"
-                f"{obs['jd']:.5f},"
-                f"{obs['mag']:.3f},"
-                f"{obs['err']:.3f},"
+                f"{self._fmt_num(obs['jd'], 5)},"
+                f"{self._fmt_num(obs['mag'], 3)},"
+                f"{self._fmt_num(obs['err'], 3)},"
                 f"{obs['filter']},"
                 f"NO,"
                 f"STD,"
                 f"{obs['comp']},"
-                f"{obs['cmag']:.3f},"
+                f"{self._fmt_num(obs['cmag'], 3)},"
                 f"{kname},"
-                f"{kmag},"
-                f"{amass},"
+                f"{self._fmt_num(kmag, 3)},"
+                f"{self._fmt_num(amass, 3)},"
                 f"na,"
                 f"{chart},"
                 f"{notes}"
@@ -130,6 +127,6 @@ class AAVSOReporter:
 
 if __name__ == "__main__":
     rep = AAVSOReporter()
-    print(f"[OK] AAVSO Reporter initialised.")
+    print("[OK] AAVSO Reporter initialised.")
     print(f"     Observer code : {rep.obs_code}")
     print(f"     Report dir    : {rep.report_dir}")

@@ -1,16 +1,14 @@
 [Unit]
-Description=SeeVar Project - Web Dashboard
-After=seevar-orchestrator.service
+Description=SeeVar Dashboard (Sovereign Link)
+After=network.target
 
 [Service]
 Type=simple
-User=ed
-WorkingDirectory=/home/ed/seevar
-ExecStart=/home/ed/seevar/.venv/bin/python3 core/dashboard/dashboard.py
+WorkingDirectory=%h/seevar
+Environment=PYTHONPATH=%h/seevar
+ExecStart=%h/seevar/.venv/bin/python3 core/dashboard/dashboard.py
 Restart=always
 RestartSec=10
-StandardOutput=append:/home/ed/seevar/logs/dashboard.log
-StandardError=append:/home/ed/seevar/logs/dashboard.err
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

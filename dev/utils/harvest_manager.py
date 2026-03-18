@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Filename: /home/ed/seevar/utils/harvest_manager.py
-Version: 1.3.0
+Filename: dev/utils/harvest_manager.py
+Version: 1.3.1
 Objective: SeeVar Harvester - Supports simulation data (.fit) and real FITS.
 """
 
@@ -10,12 +10,19 @@ import shutil
 import os
 from pathlib import Path
 
-# The 'Source' is now your simulation buffer
-SIM_SOURCE = Path("/home/ed/seevar/simulation-data/data/local_buffer")
-# The 'Destination' is the RAID Archive
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# The 'Source' is now dynamically pointing to the active project buffer
+SIM_SOURCE = PROJECT_ROOT / "data" / "local_buffer"
+
+# The 'Destination' is your specific RAID Archive
 RAID_PATH = Path("/mnt/raid1/data/AAVSO-archive")
 
 def execute_harvest():
+    if not SIM_SOURCE.exists():
+        print(f"⚠️ Harvest halted: Source buffer at {SIM_SOURCE} inaccessible.")
+        return
+
     if not RAID_PATH.exists():
         print(f"⚠️ Harvest halted: RAID archive at {RAID_PATH} inaccessible.")
         return

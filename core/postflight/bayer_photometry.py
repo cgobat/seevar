@@ -2,18 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/postflight/bayer_photometry.py
-Version: 2.0.0
-Objective: Bayer-channel aperture photometry engine for the IMX585 (GRBG pattern).
-           Extracted from pilot.py and elevated to a standalone science module.
-           Provides single-star flux extraction and multi-star differential photometry.
-           No debayering. No Siril. Direct pixel math on raw uint16 FITS.
-
-Changes from v1.0.0:
-    - SNR²-weighted ZP ensemble in differential_magnitude()
-      Replaces simple mean — suppresses outlier comp stars, reduces zp_std
-    - Dynamic aperture from Moffat PSF fit in measure_star()
-      Replaces fixed R_AP_DEFAULT with 1.7 × measured FWHM
-      Falls back to R_AP_DEFAULT if PSF fit fails
+Version: 2.0.1
+Objective: Bayer-channel aperture photometry engine for the IMX585 (GRBG pattern). Extracted from pilot.py and elevated to a standalone science module. Provides single-star flux extraction and multi-star differential photometry.
 """
 
 import logging
@@ -406,3 +396,4 @@ def differential_magnitude(
         "peak_adu":   round(t.get("peak", 0), 1),
         "r_ap_used":  target_r_ap,
     }
+

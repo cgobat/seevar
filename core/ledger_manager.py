@@ -2,16 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/ledger_manager.py
-Version:  1.6.0  # SeeVar-v1.6.0-header
-Objective: The High-Authority Mission Brain. Manages target cadence and
-           observation history. Filters tonights_plan.json by cadence,
-           records attempts and successes during flight.
-           Called by orchestrator at three points:
-             1. After planning — filter targets by cadence
-             2. After each acquire() — record attempt/success
-             3. After postflight — accountant stamps results
+Version: 1.6.1
+Objective: The High-Authority Mission Brain. Manages target cadence and observation history. Filters tonights_plan.json by cadence, records attempts and successes during flight.
 """
-# SeeVar-ledger-manager-v3.0.0
 
 import json
 import logging

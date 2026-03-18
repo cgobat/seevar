@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Objective: Infrared sky-clarity monitor using MLX90614 to prevent imaging in fog.
-"""
-"""
 Filename: core/preflight/fog_monitor.py
-Version: 1.0.0 (Kwetal)
-Role: Safety Gate - Clarity Provider
+Version: 1.0.1
+Objective: Infrared sky-clarity monitor using MLX90614 to prevent imaging in fog. Acts as a safety gate for photometry.
 """
 
 import board

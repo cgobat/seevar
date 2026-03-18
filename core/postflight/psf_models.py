@@ -1,18 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Filename: /home/ed/seevar/core/postflight/psf_models.py
-Version: 1.0.0
-Objective: PSF fitting for stellar profiles on IMX585 Bayer frames.
-           Provides FWHM estimation feeding dynamic aperture and SNR calculations.
-
-Models implemented:
-    - 2D Gaussian  : fast, adequate for synthetic/low-seeing frames
-    - Moffat       : production model, correct power-law wings for real seeing
-    - Airy disk    : reference only, not used in production pipeline
-
-All models work on a 2D numpy cutout centred on the star.
-Output: FWHMResult dataclass consumed by bayer_photometry and exposure_planner.
+Filename: core/postflight/psf_models.py
+Version: 1.0.1
+Objective: PSF fitting for stellar profiles on IMX585 Bayer frames. Provides FWHM estimation feeding dynamic aperture and SNR calculations.
 """
 
 import numpy as np

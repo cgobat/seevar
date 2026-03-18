@@ -2,15 +2,21 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/postflight/librarian.py
-Version: 2.2.0
-Objective: Securely harvest binary FITS to RAID1; prepare for NAS archival.
+Version: 2.2.1
+Objective: Securely harvest binary FITS to RAID1; prepare for NAS archival using dynamic paths.
 """
 
 import os
+import sys
 import logging
 from pathlib import Path
 from astropy.io import fits
 from datetime import datetime
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from core.utils.env_loader import load_config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] 📚 %(message)s')
 logger = logging.getLogger("Librarian")
@@ -20,10 +26,15 @@ class Librarian:
         """
         Initializes the Librarian on the RAID1 'data/' mount.
         """
-        self.vault = Path(vault_path)
+        self.vault = PROJECT_ROOT / vault_path
         self.vault.mkdir(parents=True, exist_ok=True)
-        # NAS target for final monthly reports
-        self.nas_archive = Path("/mnt/astronas/AAVSO-reports")
+        
+        # Fetch NAS target dynamically from config.toml
+        config = load_config()
+        storage_cfg = config.get("storage", {})
+        primary_dir = storage_cfg.get("primary_dir", "/mnt/astronas/")
+        
+        self.nas_archive = Path(primary_dir) / "AAVSO-reports"
 
     def audit_header(self, filepath):
         """Forensics: Ensure the 'Diamond' is valid FITS data."""
@@ -69,3 +80,4 @@ class Librarian:
 if __name__ == "__main__":
     lib = Librarian()
     print(f"Librarian active. RAID1 Vault: {lib.vault}")
+    print(f"NAS Archive target: {lib.nas_archive}")

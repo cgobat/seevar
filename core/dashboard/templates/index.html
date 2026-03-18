@@ -30,14 +30,13 @@
         .orange { background-color: var(--led-orange); box-shadow: 0 0 8px var(--led-orange); }
         .red { background-color: var(--alert-red); box-shadow: 0 0 8px var(--alert-red); }
         .grey { background-color: var(--led-grey); }
-        .blue-grey { background-color: var(--led-bluegrey); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); border: 1px solid #333; color: transparent; }
         .weather-icon { background: none; box-shadow: none; font-size: 18px; color: #fff; }
         .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80%; text-align: center; }
-        .icon-p { background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; font-size: 3em; font-weight: bold; font-family: sans-serif; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }
+        .icon-p { background: linear-gradient(135deg, #1e90ff, #005cbf); color: white; font-size: 3em; font-weight: bold; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }
         .status-main { color: var(--text-bright); font-size: 2em; letter-spacing: 5px; font-weight: 900; margin-bottom: 10px; }
         .status-sub { color: var(--text-bright); font-size: 0.9em; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
         .status-msg { color: var(--text-muted); font-size: 0.8em; font-style: italic; }
-        .pf-scoreboard { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #333; }
+        .pf-scoreboard { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 15px; }
         .pf-score-cell { text-align: center; }
         .pf-score-num { font-size: 1.5em; font-weight: 900; letter-spacing: 1px; line-height: 1; }
         .pf-score-lbl { font-size: 0.6em; color: #555; letter-spacing: 2px; margin-top: 4px; }
@@ -82,8 +81,9 @@
                 <div id="orch-sub" class="status-sub">OFF-DUTY</div>
                 <div id="orch-msg" class="status-msg">Waiting for orchestrator...</div>
             </div>
-            <div class="row" style="margin-top:auto;"><span class="label">BATTERY</span><span id="bb-batt" class="val">--%</span></div>
-            <div class="row"><span class="label">STORAGE</span><span id="bb-store" class="val">-- MB</span></div>
+            <div class="row" style="margin-top:auto;"><span class="label">BATTERY</span><span id="v-bat" class="val">--%</span></div>
+            <div class="row"><span class="label">S30 TEMP</span><span id="v-tmp" class="val">--°C</span></div>
+            <div class="row"><span class="label">STORAGE</span><span id="v-store" class="val">-- MB</span></div>
         </div>
 
         <div class="panel">
@@ -111,7 +111,7 @@
         function updateTicker() {
             if (!targetData || targetData.length === 0) return;
             const t = targetData[tickerIndex];
-            document.getElementById('t-name').innerText = t.name || "UNKNOWN";
+            document.getElementById('t-name').innerText = t.name || t.star_name || "UNKNOWN";
             document.getElementById('t-loc').innerText = `RA: ${t.ra} DEC: ${t.dec}`;
             document.getElementById('target-count-led').innerText = String(targetData.length).padStart(2, '0');
             tickerIndex = (tickerIndex + 1) % targetData.length;
@@ -120,10 +120,12 @@
         function fetchTelemetry() {
             fetch('/telemetry').then(res => res.json()).then(data => {
                 if(data.maidenhead) document.getElementById('telemetry-mh').innerText = data.maidenhead;
+                
                 if(data.weather) {
                     document.getElementById('weather-val').innerText = data.weather.status || 'N/A';
                     document.getElementById('weather-icon-led').innerText = data.weather.icon || '❓';
                 }
+
                 if(data.orchestrator) {
                     document.getElementById('orch-main').innerText = data.orchestrator.state || 'PARKED';
                     document.getElementById('orch-sub').innerText = data.orchestrator.sub || 'OFF-DUTY';
@@ -131,16 +133,19 @@
                     if(data.orchestrator.flight_log) {
                         const logs = data.orchestrator.flight_log.slice(-5);
                         document.getElementById('flight-log').innerHTML = logs.map((l, i) => 
-                            `<div class="log-line ${i === logs.length-1 ? 'latest' : ''}">${l}</div>`).join('');
+                            `<div class="log-line ${i === logs.length-1 ? 'latest' : ''}">${l}</div>`
+                        ).join('');
                     }
                 }
+
                 if(data.hardware) {
-                    document.getElementById('bb-batt').innerText = data.hardware.battery + "%";
-                    document.getElementById('bb-store').innerText = data.hardware.storage_mb + " MB";
-                    const linkLed = document.getElementById('tel-link-led');
-                    linkLed.className = 'led ' + (data.hardware.link_status === "ACTIVE" ? "green" : "red");
+                    document.getElementById('v-bat').innerText = data.hardware.battery + "%";
+                    document.getElementById('v-tmp').innerText = data.hardware.temp_c + "°C";
+                    document.getElementById('v-store').innerText = data.hardware.storage_mb + " MB";
+                    document.getElementById('tel-link-led').className = 'led ' + (data.hardware.link_status === "ACTIVE" ? "green" : "red");
                     document.getElementById('tel-link-val').innerText = data.hardware.link_status === "ACTIVE" ? "ACTIVE" : "OFFLINE";
                 }
+
                 if(data.postflight) {
                     const sb = data.postflight.scoreboard;
                     document.getElementById('pf-sched').innerText = sb.scheduled;
@@ -156,10 +161,15 @@
                         ).join('');
                     }
                 }
-            });
+            }).catch(err => console.error("Telemetry error:", err));
         }
-        setInterval(updateTicker, 4000); setInterval(fetchTelemetry, 2000);
-        setInterval(() => { document.getElementById('live-jdate').innerText = ((new Date().getTime() / 86400000) + 2440587.5).toFixed(4); }, 1000);
+
+        setInterval(updateTicker, 4000);
+        setInterval(fetchTelemetry, 2000);
+        setInterval(() => {
+            const jd = (new Date().getTime() / 86400000) + 2440587.5;
+            document.getElementById('live-jdate').innerText = jd.toFixed(4);
+        }, 1000);
         updateTicker(); fetchTelemetry();
     </script>
 </body>

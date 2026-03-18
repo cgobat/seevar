@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/dashboard/dashboard.py
-Version: 4.7.0
-Objective: Full restoration of v4.6.1 logic. Fixed startup pathing and beta-ready telemetry.
+Version: 4.6.1
+Objective: Fixed startup + real location + current_target support
 """
 
 import json
@@ -183,7 +183,10 @@ def get_flight_window(lat: float, lon: float, elev: float) -> str:
                 is_night = False
                 dawn_str = t_dt.astimezone().strftime("%H:%M")
                 break
-        res = f"{dusk_str} - {dawn_str}" if dusk_str and dawn_str else "NO ASTRONOMICAL NIGHT"
+        if dusk_str and dawn_str:
+            res = f"{dusk_str} - {dawn_str}"
+        else:
+            res = "NO ASTRONOMICAL NIGHT"
         FLIGHT_WINDOW_CACHE["date"] = today_str
         FLIGHT_WINDOW_CACHE["text"] = res
         return res

@@ -9,6 +9,8 @@ Environment=PYTHONPATH=%h/seevar
 ExecStart=%h/seevar/.venv/bin/python3 core/dashboard/dashboard.py
 Restart=always
 RestartSec=10
+StandardOutput=append:%h/seevar/logs/dashboard.log
+StandardError=append:%h/seevar/logs/dashboard.err
 
 [Install]
 WantedBy=default.target

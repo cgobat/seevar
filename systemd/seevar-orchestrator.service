@@ -9,3 +9,6 @@ Environment=PYTHONPATH=%h/seevar
 ExecStart=%h/seevar/.venv/bin/python3 core/flight/orchestrator.py
 Restart=always
 RestartSec=15
+
+[Install]
+WantedBy=default.target

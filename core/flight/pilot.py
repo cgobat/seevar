@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
+from astropy.io import fits
 from astropy.coordinates import EarthLocation, AltAz, SkyCoord, get_body
 from astropy.time import Time
 import astropy.units as u
@@ -405,14 +406,6 @@ def sovereign_stamp(
 
     # --- Assemble header -----------------------------------------------------
     h = {
-        # --- Mandatory FITS structural keys (priority order preserved by write_fits) ---
-        "SIMPLE":   True,
-        "BITPIX":   16,
-        "NAXIS":    2,
-        "NAXIS1":   width,
-        "NAXIS2":   height,
-        "BZERO":    32768.0,   # CRITICAL: unsigned uint16 → signed int16 FITS convention
-        "BSCALE":   1.0,
         # --- Target identity ---
         "OBJECT":   target.name,
         "OBJCTRA":  _hours_to_hms(target.ra_hours),
@@ -474,48 +467,17 @@ def sovereign_stamp(
 def write_fits(array: np.ndarray, header_dict: dict, output_path: Path) -> bool:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # 1. Offset the unsigned 16-bit IMX585 data into signed 16-bit space for FITS standard
-    array_offset = array.astype(np.int32) - 32768
-    array_signed = array_offset.astype(np.int16)
-    
-    if array_signed.dtype.byteorder not in (">",):
-        array_signed = array_signed.byteswap().view(array_signed.dtype.newbyteorder(">"))
+    header = fits.Header()
+    header.update(header_dict)
+    header["COMMENT"] = f"{SWCREATE} M2"
 
-    def card(key: str, value, comment: str = "") -> str:
-        key = key.upper()[:8].ljust(8)
-        if isinstance(value, bool): val_str = f"{'T' if value else 'F':>20}"
-        elif isinstance(value, int): val_str = f"{value:>20}"
-        elif isinstance(value, float): val_str = f"{value:>20.10G}"
-        elif isinstance(value, str):
-            val_str = f"'{value.replace('\'', '\'\''):<8}'"
-            val_str = f"{val_str:<20}"
-        else:
-            val_str = f"'{str(value):<8}'"
-            val_str = f"{val_str:<20}"
-        c = f" / {comment}" if comment else ""
-        return f"{key}= {val_str}{c}"[:80].ljust(80)
-
-    # BZERO and BSCALE must appear immediately after NAXIS properties
-    priority_keys = ["SIMPLE", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "BZERO", "BSCALE"]
-    records = [card(k, header_dict[k]) for k in priority_keys if k in header_dict]
-    records.extend([card(k, v) for k, v in header_dict.items() if k not in priority_keys])
-    
-    records.append("COMMENT   SeeVar v5.1.0 M2 -- BZERO Signed-Integer Protected".ljust(80))
-    records.append("END".ljust(80))
-
-    while (len(records) * 80) % 2880 != 0: records.append(" " * 80)
-    header_bytes = "".join(records).encode("ascii")
-
-    data_bytes = array_signed.tobytes()
-    remainder = len(data_bytes) % 2880
-    if remainder: data_bytes += b"\x00" * (2880 - remainder)
+    hdu = fits.PrimaryHDU(data=array.astype(np.uint16), header=header)
 
     try:
-        with open(output_path, "wb") as f:
-            f.write(header_bytes)
-            f.write(data_bytes)
+        hdu.writeto(output_path, overwrite=True)
         return True
-    except OSError: return False
+    except OSError:
+        return False
 
 class DiamondSequence:
     """Sovereign acquisition loop — STATE_MACHINE.md DiamondSequence.

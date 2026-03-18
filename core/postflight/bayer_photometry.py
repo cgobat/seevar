@@ -17,7 +17,6 @@ Changes from v1.0.0:
 """
 
 import logging
-import math
 import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
@@ -94,7 +93,7 @@ def aperture_flux(
     ap_sum   = ap_stats.sum
     n_ap     = ap_stats.sum_aper_area
     net_flux = ap_sum - sky_median * n_ap
-    snr      = net_flux / (sky_std * math.sqrt(n_ap)) if sky_std > 0 and n_ap > 0 else 0.0
+    snr      = net_flux / (sky_std * np.sqrt(n_ap)) if sky_std > 0 and n_ap > 0 else 0.0
 
     return net_flux, sky_median, snr
 
@@ -328,7 +327,7 @@ def differential_magnitude(
         if comp_snr < MIN_COMP_SNR:
             continue
 
-        zp = v_mag + 2.5 * math.log10(m[flux_key])
+        zp = v_mag + 2.5 * np.log10(m[flux_key])
         zero_points.append(zp)
         weights.append(comp_snr ** 2)   # SNR² weighting
 
@@ -347,11 +346,11 @@ def differential_magnitude(
         np.sqrt(np.sum(w_arr * (zp_arr - avg_zp) ** 2) / w_sum)
     )
 
-    magnitude = avg_zp - 2.5 * math.log10(target_flux)
+    magnitude = avg_zp - 2.5 * np.log10(target_flux)
 
     # Photometric error: quadrature sum of weighted ZP scatter and SNR noise
     snr_err   = 1.0857 / target_snr if target_snr > 0 else 9.99
-    total_err = round(math.sqrt(zp_std ** 2 + snr_err ** 2), 3)
+    total_err = round(np.sqrt(zp_std ** 2 + snr_err ** 2), 3)
 
     return {
         "status":     "ok",

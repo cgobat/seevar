@@ -687,7 +687,9 @@ def sovereign_stamp(
         "CDELT2": 0.001042,
         "CTYPE1": "RA---TAN",
         "CTYPE2": "DEC--TAN",
-        "DATE-OBS": utc_obs.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3],
+        "DATE-OBS": t_astropy.isot,         # ISO 8601 format
+        "MJD-OBS":  t_astropy.mjd,          # Modified Julian Date
+        "JD":       round(t_astropy.jd, 6), # Julian Date
         "EXPTIME": target.exp_ms / 1000.0,
         "EXPMS": int(target.exp_ms),
         "INSTRUME": INSTRUMENT,

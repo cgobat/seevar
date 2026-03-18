@@ -25,7 +25,7 @@ S30-Pro's network address. Never hardcoded. <!-- telescope_ip_config_note -->
 
 ## JSON-RPC Wire Format (port 4700)
 
-All messages are newline-terminated JSON, sent as UTF-8:
+All messages are CRLF-terminated JSON, sent as UTF-8:
 
 ```python
 msg = {"id": <int>, "method": "<method>", "params": <value>}

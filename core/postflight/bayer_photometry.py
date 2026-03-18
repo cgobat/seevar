@@ -17,8 +17,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.stats import sigma_clip
 from astropy.wcs import WCS
-
-from core.postflight.aperture_photometry import PhotometryStats, classify_quality, refine_centroid
+from photutils.aperture import ApertureStats, CircularAnnulus, CircularAperture
 
 logger = logging.getLogger("seevar.bayer_photometry")
 
@@ -103,22 +102,31 @@ def aperture_flux(
     - target photon noise (Poisson approximation)
     - sky/background noise across the aperture
     """
-    y_idx, x_idx = np.ogrid[-cy:image.shape[0] - cy, -cx:image.shape[1] - cx]
-    abs_y = y_idx + cy
-    abs_x = x_idx + cx
+    data = np.asanyarray(image, dtype=np.float64)
+    yy, xx = np.indices(data.shape)
 
-    b_mask = _channel_mask(abs_y, abs_x, bayer_pattern, bayer_channel)
+    if bayer_channel == "ALL":
+        b_mask = np.ones_like(yy, dtype=bool)
+    elif bayer_channel == "G":
+        b_mask = (yy % 2) == (xx % 2)
+    elif bayer_channel == "R":
+        b_mask = (yy % 2 == 0) & (xx % 2 == 1)
+    elif bayer_channel == "B":
+        b_mask = (yy % 2 == 1) & (xx % 2 == 0)
+    else:
+        raise ValueError(f"Invalid bayer channel: {bayer_channel!r}")
 
-    r2 = (x_idx ** 2 + y_idx ** 2).astype(np.float64)
-    ap_mask = (r2 <= r_ap ** 2) & b_mask
-    sky_mask = (r2 >= r_sky_in ** 2) & (r2 <= r_sky_out ** 2) & b_mask
+    exclusion_mask = ~b_mask
+    aperture    = CircularAperture((cx, cy), r=r_ap)
+    sky_annulus = CircularAnnulus((cx, cy), r_in=r_sky_in, r_out=r_sky_out)
 
-    sky_vals = image[sky_mask].astype(np.float64)
-    sky_median = float(np.median(sky_vals)) if len(sky_vals) > 0 else 0.0
-    sky_std = float(sky_vals.std()) if len(sky_vals) > 0 else 1.0
+    sky_stats  = ApertureStats(data, sky_annulus, mask=exclusion_mask)
+    sky_median = sky_stats.median
+    sky_std    = sky_stats.std
 
-    ap_sum = float(image[ap_mask].astype(np.float64).sum())
-    n_ap = int(ap_mask.sum())
+    ap_stats = ApertureStats(data, aperture, mask=exclusion_mask)
+    ap_sum   = ap_stats.sum
+    n_ap     = ap_stats.sum_aper_area
     net_flux = ap_sum - sky_median * n_ap
 
     photon_noise_sq = max(net_flux, 0.0)
@@ -294,6 +302,8 @@ class BayerFITS:
             "peak": peak,
             "saturated": saturated,
             "r_ap": r_ap,
+            "r_sky_in": r_sky_in_used,
+            "r_sky_out": r_sky_out_used,
             "bayer_pattern": self.bayer_pattern,
         }
 

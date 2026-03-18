@@ -9,7 +9,7 @@ astropy-backed sigma clipping on comparison-star zero points.
 """
 
 import logging
-import math
+import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -128,11 +128,7 @@ def aperture_flux(
     ap_sum   = ap_stats.sum
     n_ap     = ap_stats.sum_aper_area
     net_flux = ap_sum - sky_median * n_ap
-
-    photon_noise_sq = max(net_flux, 0.0)
-    sky_noise_sq = (sky_std ** 2) * n_ap
-    total_noise = math.sqrt(photon_noise_sq + sky_noise_sq) if n_ap > 0 else 0.0
-    snr = net_flux / total_noise if total_noise > 0 else 0.0
+    snr      = net_flux / (sky_std * np.sqrt(n_ap)) if sky_std > 0 and n_ap > 0 else 0.0
 
     return net_flux, sky_median, sky_std, snr
 
@@ -423,21 +419,11 @@ def differential_magnitude(
         if comp_snr < MIN_COMP_SNR:
             continue
 
-        zp = v_mag + 2.5 * math.log10(m[flux_key])
-        comp_inst_mag = INSTRUMENTAL_MAG_ZEROPOINT - 2.5 * math.log10(m[flux_key])
-        comp_inst_err = 1.0857 / comp_snr if comp_snr > 0 else 9.99
-        comp_rows.append({
-            "zp": float(zp),
-            "weight": float(comp_snr ** 2),
-            "snr": float(comp_snr),
-            "source_id": comp.get("source_id", "GAIA"),
-            "v_mag": float(v_mag),
-            "v_mag_err": float(comp.get("v_mag_err", 0.0)),
-            "inst_mag": round(float(comp_inst_mag), 3),
-            "inst_err": round(float(comp_inst_err), 3),
-        })
+        zp = v_mag + 2.5 * np.log10(m[flux_key])
+        zero_points.append(zp)
+        weights.append(comp_snr ** 2)   # SNR² weighting
 
-    if not comp_rows:
+    if not zero_points:
         return {"status": "fail", "error": "no_valid_comp_stars"}
 
     n_comps_raw = len(comp_rows)
@@ -457,13 +443,11 @@ def differential_magnitude(
 
     avg_zp = float(np.sum(w_arr * zp_arr) / w_sum)
     zp_std = float(np.sqrt(np.sum(w_arr * (zp_arr - avg_zp) ** 2) / w_sum))
-    magnitude = avg_zp - 2.5 * math.log10(target_flux)
-    target_inst_mag = INSTRUMENTAL_MAG_ZEROPOINT - 2.5 * math.log10(target_flux)
+    magnitude = avg_zp - 2.5 * np.log10(target_flux)
 
+    # Photometric error: quadrature sum of weighted ZP scatter and SNR noise
     snr_err = 1.0857 / target_snr if target_snr > 0 else 9.99
-    total_err = round(math.sqrt(zp_std ** 2 + snr_err ** 2), 3)
-
-    brightest = min(clipped_rows, key=lambda row: row["v_mag"])
+    total_err = round(np.sqrt(zp_std ** 2 + snr_err ** 2), 3)
 
     return {
         "status": "ok",

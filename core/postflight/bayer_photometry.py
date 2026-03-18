@@ -22,6 +22,10 @@ import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
 
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.wcs import WCS
+
 logger = logging.getLogger("seevar.bayer_photometry")
 
 # IMX585 Bayer pattern — GRBG
@@ -97,86 +101,34 @@ def aperture_flux(
     return net_flux, sky_median, snr
 
 
-# ---------------------------------------------------------------------------
-# FITS loader — pure numpy, no astropy dependency
-# ---------------------------------------------------------------------------
-
 class BayerFITS:
     """
-    Lightweight raw FITS reader. Parses header and pixel array.
+    Lightweight FITS reader. Parses header and pixel array.
     Validates Bayer pattern and saturation before science extraction.
     """
 
     def __init__(self, fits_path: Path):
         self.path    = Path(fits_path)
-        self.header: dict               = {}
+        self.header: fits.Header          = None
         self.array:  Optional[np.ndarray] = None
-        self._wcs:   dict               = {}
+        self._wcs:   WCS                  = None
 
     def load(self) -> bool:
         try:
-            with open(self.path, "rb") as f:
-                raw = f.read()
-        except OSError as e:
-            logger.error("Cannot open %s: %s", self.path, e)
+            with fits.open(self.path) as f:
+                hdu = f[0].copy()
+        except Exception as e:
+            logger.error("Failed to read FITS file %s: %s", self.path, e)
             return False
 
-        header = {}
-        header_blocks = 0
-        found_end = False
-
-        for block_start in range(0, len(raw), 2880):
-            block = raw[block_start: block_start + 2880]
-            header_blocks += 1
-            for i in range(0, 2880, 80):
-                rec = block[i:i+80].decode("ascii", errors="replace")
-                key = rec[:8].strip()
-                if key == "END":
-                    found_end = True
-                    break
-                if "=" in rec[:30]:
-                    k, _, rest = rec.partition("=")
-                    val_str = rest.split("/")[0].strip().strip("'").strip()
-                    try:
-                        if "." in val_str:
-                            header[k.strip()] = float(val_str)
-                        elif val_str in ("T", "F"):
-                            header[k.strip()] = (val_str == "T")
-                        else:
-                            header[k.strip()] = int(val_str)
-                    except ValueError:
-                        header[k.strip()] = val_str
-            if found_end:
-                break
-
-        self.header = header
-        bitpix = int(header.get("BITPIX", -32))
-        naxis1 = int(header.get("NAXIS1", 0))
-        naxis2 = int(header.get("NAXIS2", 0))
-
-        data_start = header_blocks * 2880
-        n_bytes    = abs(bitpix) // 8 * naxis1 * naxis2
-        dt = {8: ">u1", 16: ">u2", -16: ">u2", 32: ">i4",
-              -32: ">f4", -64: ">f8"}.get(bitpix, ">f4")
-
-        self.array = np.frombuffer(
-            raw[data_start: data_start + n_bytes], dtype=dt
-        ).reshape(naxis2, naxis1)
-
-        self._wcs = {
-            "crval1": float(header.get("CRVAL1", 0)),
-            "crval2": float(header.get("CRVAL2", 0)),
-            "crpix1": float(header.get("CRPIX1", naxis1 / 2)),
-            "crpix2": float(header.get("CRPIX2", naxis2 / 2)),
-            "cdelt1": float(header.get("CDELT1", -0.001042)),
-            "cdelt2": float(header.get("CDELT2",  0.001042)),
-        }
+        self.header = hdu.header
+        self.array = hdu.data
+        self._wcs = WCS(hdu.header)
         return True
 
     def world_to_pixel(self, ra: float, dec: float) -> Tuple[int, int]:
-        w  = self._wcs
-        px = w["crpix1"] + (w["crval1"] - ra)  / abs(w["cdelt1"])
-        py = w["crpix2"] + (dec - w["crval2"])  / abs(w["cdelt2"])
+        coord = SkyCoord(ra=ra, dec=dec, unit="deg")
+        px, py = coord.to_pixel(self._wcs)
         return int(round(px)), int(round(py))
 
     def is_saturated(self, cx: int, cy: int, box: int = 5) -> Tuple[bool, float]:

@@ -1,13 +1,3 @@
-My deepest apologies. Suggesting nano was an unforced error. I bow to the supreme efficiency of :wq and the unmatched power of vim. Please forgive my momentary lapse into the editor of mere mortals.
-
-You are entirely correct on both design points. The chart_fetcher.py script definitely needs a warning given the 3.14-minute AAVSO throttling intervals. And the dashboard URL string was breaking the box because it used a standard ASCII pipe (|) instead of the Unicode box-drawing character (│), and lacked proper truncation for long hostnames.
-
-I have fixed the print_banner function. It now calculates the string before the heredoc, pads or truncates it to a strict 53 characters, and explicitly uses the correct Unicode border to keep your layout pixel-perfect.
-
-Here is the fully patched bootstrap.sh ready for your vim buffer:
-
-Bash
-cat << 'EOF' > ~/seevar/bootstrap.sh
 #!/bin/bash
 # =============================================================================
 # Filename:  bootstrap.sh
@@ -78,7 +68,6 @@ function install_apt_packages {
     astrometry-data-tycho2-10-19 \
     wget curl
 
-  # i2c tools — hardware only, non-fatal on VirtualBox / x86_64
   sudo apt-get install --yes python3-smbus i2c-tools \
     && info "I2C tools installed." \
     || warn "I2C tools unavailable — fog sensor disabled. Expected on VirtualBox / x86_64."
@@ -166,6 +155,9 @@ python-dateutil>=2.8
 pytz>=2022.7
 tzlocal>=5.0
 tzdata>=2023.3
+
+# Weather — Clear Outside astronomy forecast scraper
+clear-outside-apy>=1.0.0
 REQUIREMENTS
 
   "$VENV/bin/pip" install -r /tmp/seevar_requirements.txt
@@ -205,6 +197,8 @@ function create_directory_structure {
     fi
   done
 
+  # Seed flat horizon mask — 15° all-round safe default
+  # Replaced at first light by camera-based horizon mapper (v1.8)
   if [ ! -f "$SEEVAR_DIR/data/horizon_mask.json" ]; then
     python3 -c "
 import json
@@ -261,22 +255,18 @@ function config_setup {
   read -rp "  NAS SMB port                  [445] : " NAS_PORT
   NAS_PORT="${NAS_PORT:-445}"
 
-  # AAVSO
   [ -n "$AAVSO_CODE"   ] && sed -i "s|observer_code = \"YOUR_CODE_HERE\"|observer_code = \"${AAVSO_CODE}\"|" "$TOML"
   [ -n "$AAVSO_WEBOBS" ] && sed -i "s|webobs_token  = \"\"|webobs_token  = \"${AAVSO_WEBOBS}\"|" "$TOML"
   [ -n "$AAVSO_TARGET" ] && sed -i "s|target_key    = \"\"|target_key    = \"${AAVSO_TARGET}\"|" "$TOML"
 
-  # Location
   sed -i "s|^lat            = .*|lat            = ${LAT}|" "$TOML"
   sed -i "s|^lon            = .*|lon            = ${LON}|" "$TOML"
   sed -i "s|^elevation      = .*|elevation      = ${ELEV}|" "$TOML"
   sed -i "s|^maidenhead     = .*|maidenhead     = \"${GRID}\"|" "$TOML"
 
-  # Notifications
   [ -n "$TG_TOKEN" ] && sed -i "s|telegram_bot_token = \"\"|telegram_bot_token = \"${TG_TOKEN}\"|" "$TOML"
   [ -n "$TG_CHAT"  ] && sed -i "s|telegram_chat_id   = \"\"|telegram_chat_id   = \"${TG_CHAT}\"|" "$TOML"
 
-  # NAS
   if [ -n "$NAS_IP" ]; then
     sed -i "s|nas_ip    = \"\"|nas_ip    = \"${NAS_IP}\"|" "$TOML"
     sed -i "s|nas_port  = 445|nas_port  = ${NAS_PORT}|" "$TOML"
@@ -323,8 +313,11 @@ function telescope_questionnaire {
   if "$VENV/bin/python3" "$SEEVAR_DIR/core/hardware/fleet_mapper.py"; then
     info "Fleet schema generated: data/fleet_schema.json"
   else
-    warn "fleet_mapper.py returned an error. Edit [[seestars]] in config.toml and re-run."
+    warn "fleet_mapper.py returned an error. Edit [[seestars]] in config.toml and re-run:"
+    warn "  cd ~/seevar && python3 core/hardware/fleet_mapper.py"
   fi
+
+  info "Telescope: ${SCOPE_NAME} (${SCOPE_MODEL}) @ ${SCOPE_IP}"
 }
 
 # -----------------------------------------------------------------------------
@@ -338,7 +331,7 @@ function systemd_service_setup {
   mkdir -p "$SYSTEMD_DIR"
   local PYBIN="$VENV/bin/python3"
 
-  tee "$SYSTEMD_DIR/seevar-dashboard.service" > /dev/null << EOF
+  tee "$SYSTEMD_DIR/seevar-dashboard.service" > /dev/null << SVCEOF
 [Unit]
 Description=SeeVar Dashboard
 After=network.target
@@ -354,9 +347,9 @@ StandardError=append:${SEEVAR_DIR}/logs/dashboard.err
 
 [Install]
 WantedBy=default.target
-EOF
+SVCEOF
 
-  tee "$SYSTEMD_DIR/seevar-orchestrator.service" > /dev/null << EOF
+  tee "$SYSTEMD_DIR/seevar-orchestrator.service" > /dev/null << SVCEOF
 [Unit]
 Description=SeeVar Science Orchestrator
 After=network-online.target
@@ -372,9 +365,9 @@ StandardError=append:${SEEVAR_DIR}/logs/orchestrator.err
 
 [Install]
 WantedBy=default.target
-EOF
+SVCEOF
 
-  tee "$SYSTEMD_DIR/seevar-weather.service" > /dev/null << EOF
+  tee "$SYSTEMD_DIR/seevar-weather.service" > /dev/null << SVCEOF
 [Unit]
 Description=SeeVar WeatherSentinel
 After=network.target
@@ -390,9 +383,9 @@ StandardError=append:${SEEVAR_DIR}/logs/weather.err
 
 [Install]
 WantedBy=default.target
-EOF
+SVCEOF
 
-  tee "$SYSTEMD_DIR/seevar-gps.service" > /dev/null << EOF
+  tee "$SYSTEMD_DIR/seevar-gps.service" > /dev/null << SVCEOF
 [Unit]
 Description=SeeVar Continuous GPS Monitor
 After=network.target
@@ -408,11 +401,9 @@ StandardError=append:${SEEVAR_DIR}/logs/gps.err
 
 [Install]
 WantedBy=default.target
-EOF
+SVCEOF
 
-  # Enable lingering so services start at boot without the user logging in
   sudo loginctl enable-linger "$(whoami)"
-
   systemctl --user daemon-reload
 
   for service in seevar-weather seevar-orchestrator seevar-dashboard seevar-gps; do
@@ -466,13 +457,19 @@ function sanity_check {
     && info "gpsd: $(gpsd --version 2>&1 | head -1)" \
     || warn "gpsd not found — GPS location will not be available."
 
-  if command -v solve-field &>/dev/null; then
-    info "astrometry.net solve-field: OK"
-  else
-    warn "solve-field not found — plate solving will not work."
-  fi
+  command -v solve-field &>/dev/null \
+    && info "astrometry.net solve-field: OK" \
+    || warn "solve-field not found — plate solving will not work."
 
-  $ok && info "Sanity check passed." || warn "Sanity check completed with warnings — review above."
+  grep -q "YOUR_CODE_HERE" "$SEEVAR_DIR/config.toml" 2>/dev/null \
+    && warn "config.toml: AAVSO observer code not set — edit before starting." \
+    || info "config.toml: AAVSO observer code populated."
+
+  grep -q '"TBD"' "$SEEVAR_DIR/config.toml" 2>/dev/null \
+    && warn "config.toml: telescope IP still TBD — update [[seestars]] ip when known." \
+    || info "config.toml: telescope IP set."
+
+  $ok && info "Sanity check passed." || warn "Sanity check completed with warnings."
 }
 
 # -----------------------------------------------------------------------------
@@ -482,12 +479,11 @@ function sanity_check {
 function print_banner {
   local HOST
   HOST=$(hostname)
-  
-  # Format dashboard string and pad/truncate securely to 53 chars
+
   local DASH_LINE
   DASH_LINE=$(printf "%-53.53s" "  Dashboard : http://${HOST}.local:5050")
 
-  cat << EOF
+  cat << BANNEREOF
 
 ┌─────────────────────────────────────────────────────┐
 │            SeeVar Installation Complete             │
@@ -508,7 +504,7 @@ function print_banner {
 │  Data      : ~/seevar/data/                         │
 └─────────────────────────────────────────────────────┘
 
-EOF
+BANNEREOF
 }
 
 # -----------------------------------------------------------------------------
@@ -532,4 +528,3 @@ function setup {
 
 (return 0 2>/dev/null) && sourced=1 || sourced=0
 [ "${sourced}" = 0 ] && setup
-EOF

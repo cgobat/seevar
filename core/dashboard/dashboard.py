@@ -331,7 +331,7 @@ def build_postflight(ledger: dict, dusk_dt) -> dict:
 @app.route('/')
 def index():
     target_data = load_plan()
-    config = load_config("~/seestar_organizer/config.toml")
+    config = load_config("~/seevar/config.toml")
     loc    = config.get('location', {})
     
     fw_text = get_flight_window(
@@ -344,7 +344,7 @@ def index():
 
 @app.route('/telemetry')
 def get_telemetry():
-    config = load_config("~/seestar_organizer/config.toml")
+    config = load_config("~/seevar/config.toml")
     loc    = config.get('location', {})
     
     state = {

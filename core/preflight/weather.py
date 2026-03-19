@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/preflight/weather.py
-Version: 1.6.0
+Version: 1.6.1
 Objective: Dual-source weather consensus daemon. Evaluates conditions only
            within tonight's astronomical dark window (sun < sun_altitude_limit).
            Source 1 — open-meteo   : precipitation, wind, humidity (hard aborts)
@@ -88,8 +88,10 @@ def get_dark_window(lat: float, lon: float,
         from skyfield.api import load, wgs84
         from skyfield import almanac
 
-        ts   = load.timescale()
-        eph  = load.open(str(PROJECT_ROOT / "catalogs" / "de421.bsp"))
+        ts     = load.timescale()
+        from skyfield.api import Loader
+        sky_load = Loader(str(PROJECT_ROOT / "catalogs"))
+        eph      = sky_load("de421.bsp")
         location = wgs84.latlon(lat, lon)
 
         now_utc = datetime.now(timezone.utc)
@@ -235,8 +237,7 @@ class WeatherSentinel:
         """
         try:
             from clear_outside_apy import ClearOutsideAPY
-            api = ClearOutsideAPY(str(round(lat, 2)), str(round(lon, 2)),
-                                  view="current")
+            api = ClearOutsideAPY(str(round(lat, 2)), str(round(lon, 2)), "current")
             api.update()
             data = api.pull()
 
@@ -370,7 +371,7 @@ class WeatherSentinel:
 
 
 if __name__ == "__main__":
-    log.info("WeatherSentinel v1.6.0 starting...")
+    log.info("WeatherSentinel v1.6.1 starting...")
     sentinel = WeatherSentinel()
     while True:
         sentinel.get_consensus()

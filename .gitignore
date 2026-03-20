@@ -1,122 +1,71 @@
 
+# -----------------------------------------------------------------------------
 # =============================================================================
-# SeeVar .gitignore
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# Credentials & Config — never commit real config
-# -----------------------------------------------------------------------------
-config.toml
-config.toml.ed
-*.key
-*.token
-.env
-
-# -----------------------------------------------------------------------------
-# Python
-# -----------------------------------------------------------------------------
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-
-# -----------------------------------------------------------------------------
-# Tests & Dev Utilities — not part of public install
-# -----------------------------------------------------------------------------
-tests/
-utils/
-
-# -----------------------------------------------------------------------------
-# Logs
-# -----------------------------------------------------------------------------
-logs/
-*.log
-*.err
-
-# -----------------------------------------------------------------------------
-# Data — track structure, never content
-# -----------------------------------------------------------------------------
-data/local_buffer/
-data/archive/
-data/process/
-data/raw/
-data/sequences/
-data/reports/
-data/ledger.json
-data/system_state.json
-data/weather_state.json
-data/hardware_telemetry.json
-data/tonights_plan.json
-data/ssc_payload.json
-
-# -----------------------------------------------------------------------------
-# Catalogs — populated at runtime by fetcher, not shipped
-# -----------------------------------------------------------------------------
-catalogs/campaign_targets.json
-catalogs/federation_catalog.json
-
-# -----------------------------------------------------------------------------
-# FITS & Science Files — never in the repo
-# -----------------------------------------------------------------------------
-*.fit
-*.fits
-*.fts
-
-# -----------------------------------------------------------------------------
+*~
 # Astrometry solver byproducts
-# -----------------------------------------------------------------------------
 *.axy
-*.xyls
-*.corr
-*.match
-*.rdls
-*.solved
-*.wcs
-*.new
-
-# -----------------------------------------------------------------------------
-# Siril scripts (user-generated)
-# -----------------------------------------------------------------------------
-*.ssf
-
-# -----------------------------------------------------------------------------
-# Storage mounts — OS-level, not repo content
-# -----------------------------------------------------------------------------
-/mnt/
-
-# -----------------------------------------------------------------------------
-# Runtime state
-# -----------------------------------------------------------------------------
-/dev/shm/
-
-# -----------------------------------------------------------------------------
-# Editor & OS noise
-# -----------------------------------------------------------------------------
-.DS_Store
-*.swp
 *.bak
 *.bak.*
-*~
-.idea/
-.vscode/
-
-# -----------------------------------------------------------------------------
-# Spreadsheets & private reports
-# -----------------------------------------------------------------------------
-*.xlsx
+catalogs/campaign_targets.json
+catalogs/federation_catalog.json
+# Catalogs — populated at runtime by fetcher, not shipped
+config.toml
+config.toml.ed
+*.corr
+# Credentials & Config — never commit real config
 *.csv
 data/
+data/archive/
+data/hardware_telemetry.json
+data/ledger.json
 data/local_buffer/
-data/
+data/process/
+data/raw/
+data/reports/
+data/sequences/
+data/ssc_payload.json
+data/system_state.json
+data/tonights_plan.json
+# Data — track structure, never content
+data/weather_state.json
+/dev/shm/
+.DS_Store
+# Editor & OS noise
+.env
+*.err
+*.fit
+*.fits
+# FITS & Science Files — never in the repo
+*.fts
+.idea/
+*.key
+*.log
 logs/
-config.toml
+# Logs
+*.match
+/mnt/
+*.new
 *.pyc
 __pycache__/
-data/
-data/
-logs/
-config.toml
-*.pyc
-__pycache__/
+*.pyd
+*.pyo
+# Python
+*.rdls
+# Runtime state
+# SeeVar .gitignore
+# Siril scripts (user-generated)
+*.solved
+# Spreadsheets & private reports
+*.ssf
+# Storage mounts — OS-level, not repo content
+*.swp
+tests/
+# Tests & Dev Utilities — not part of public install
+*.token
+utils/
+.venv/
+venv/
+.vscode/
+*.wcs
+*.xlsx
+*.xyls

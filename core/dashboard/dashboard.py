@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/dashboard/dashboard.py
-Version: 4.5.0
-Objective: M5: HW_CACHE reads battery_pct and temp_c from system_state.json telemetry block.
+Version: 4.5.3
+Objective: Remove hardcoded local coordinates; fallback to Greenwich.
 """
 import json
 import logging
@@ -64,7 +64,7 @@ app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
 HW_CACHE = {
     "timestamp": 0,
     "data": {
-        "link_status": "OFFLINE",
+        "link_status": "WAITING",
         "battery":     "N/A",
         "temp_c":      "N/A",
         "storage_mb":  "N/A"
@@ -94,7 +94,6 @@ def refresh_hw_cache():
             log.warning("HW_CACHE env_status refresh failed: %s", e)
 
     # Source 1b: storage_mb fallback — measure local_buffer if not in env_status
-    # SeeVar-stor-fallback
     if HW_CACHE["data"]["storage_mb"] in ("N/A", None):
         try:
             local_buffer = DATA_DIR / "local_buffer"
@@ -122,6 +121,10 @@ def refresh_hw_cache():
             temp = tel.get("temp_c")
             if temp is not None:
                 HW_CACHE["data"]["temp_c"] = str(round(temp, 1))
+            # Link status — written by orchestrator on successful TCP connect
+            link = state.get("link_status")
+            if link:
+                HW_CACHE["data"]["link_status"] = link
         except (json.JSONDecodeError, OSError) as e:
             log.warning("HW_CACHE state refresh failed: %s", e)
 
@@ -161,7 +164,6 @@ def load_plan() -> list:
 # Astronomical Twilight Engine (-18.0°)
 # ---------------------------------------------------------------------------
 FLIGHT_WINDOW_CACHE = {"date": None, "text": "CALCULATING..."}
-# Dusk datetime cache — used by postflight session filter
 DUSK_CACHE = {"date": None, "dt": None}
 
 def get_dusk_utc(lat: float, lon: float, elev: float):
@@ -199,7 +201,6 @@ def get_flight_window(lat: float, lon: float, elev: float) -> str:
         loc = EarthLocation(lat=lat*u.deg, lon=lon*u.deg, height=elev*u.m)
         utc_now = datetime.now(timezone.utc)
         
-        # Start scanning from Noon UTC today
         start_time = datetime(utc_now.year, utc_now.month, utc_now.day, 12, 0, tzinfo=timezone.utc)
         if utc_now.hour < 12:
             start_time -= timedelta(days=1)
@@ -207,7 +208,6 @@ def get_flight_window(lat: float, lon: float, elev: float) -> str:
         dusk_str, dawn_str = None, None
         is_night = False
         
-        # 5-minute interval scan across 24 hours
         for m in range(0, 24 * 60, 5):
             t_dt = start_time + timedelta(minutes=m)
             t = Time(t_dt)
@@ -238,13 +238,7 @@ def get_flight_window(lat: float, lon: float, elev: float) -> str:
 # Postflight session builder
 # ---------------------------------------------------------------------------
 def build_postflight(ledger: dict, dusk_dt) -> dict:
-    """
-    Derives postflight scoreboard + last-5 log from ledger entries.
-    Session boundary = astronomical dusk for current night.
-    """
     entries = ledger.get("entries", {})
-
-    # plan_file_scheduled — read tonight's plan for scheduled count
     plan_data  = load_json_file(PLAN_FILE, [])
     scheduled  = len(plan_data) if isinstance(plan_data, list) else len(plan_data.get("targets", []))
     attempted  = 0
@@ -252,19 +246,16 @@ def build_postflight(ledger: dict, dusk_dt) -> dict:
     failed     = 0
     log_rows   = []
 
-    STATUS_FAIL = {"FAILED_QC", "FAILED_QC_LOW_SNR", "FAILED_SATURATED",
-                   "FAILED_NO_WCS", "ERROR"}
+    STATUS_FAIL = {"FAILED_QC", "FAILED_QC_LOW_SNR", "FAILED_SATURATED", "FAILED_NO_WCS", "ERROR"}
 
     for name, e in entries.items():
         obs_str = e.get("last_obs_utc")
         if not obs_str:
             continue
-        # Parse ISO timestamp — strip trailing Z for fromisoformat compat
         try:
             ts = datetime.fromisoformat(obs_str.rstrip("Z")).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-        # Session filter
         if dusk_dt and ts < dusk_dt:
             continue
 
@@ -280,7 +271,6 @@ def build_postflight(ledger: dict, dusk_dt) -> dict:
         else:
             row_class = "warn"
 
-        # ZP scatter colour hint
         zp_std = e.get("last_zp_std")
         if zp_std is None:
             zp_class = "z-bad"
@@ -299,8 +289,6 @@ def build_postflight(ledger: dict, dusk_dt) -> dict:
         mag_str = f"{mag:.3f} ±{err:.3f}" if mag is not None and err is not None else status.replace("FAILED_","")
         snr_str = f"{snr:.0f}" if snr is not None else "—"
         zp_str  = f"{zp:.2f}±{zp_std:.2f}" if zp is not None and zp_std is not None else "—"
-
-        # UTC HH:MM from timestamp
         time_str = ts.strftime("%H:%M")
 
         log_rows.append({
@@ -315,21 +303,18 @@ def build_postflight(ledger: dict, dusk_dt) -> dict:
             "ts":        ts.isoformat(),
         })
 
-    # Newest first, cap at 5
     log_rows.sort(key=lambda r: r["ts"], reverse=True)
     log_rows = log_rows[:5]
-    # Remove sort key before sending to client
     for r in log_rows:
         del r["ts"]
 
-    # Overall status — NAGIOS worst-child
     if failed > 0:
         overall = "orange"
     else:
         overall = "green" if observed > 0 else "grey"
 
     phot_led   = "green" if observed > 0 else ("orange" if attempted > 0 else "grey")
-    aavso_led  = "grey"   # reporter not yet wired — placeholder
+    aavso_led  = "grey"
 
     return {
         "scoreboard": {
@@ -344,7 +329,6 @@ def build_postflight(ledger: dict, dusk_dt) -> dict:
         "log":       log_rows,
     }
 
-
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -355,7 +339,7 @@ def index():
     loc    = config.get('location', {})
     
     fw_text = get_flight_window(
-        loc.get('lat', 0.0), 
+        loc.get('lat', 51.4769), 
         loc.get('lon', 0.0), 
         loc.get('elevation', 0.0)
     )
@@ -369,9 +353,9 @@ def get_telemetry():
     
     state = {
         "gps_status": "NO-GPS-LOCK",
-        "lat":        loc.get('lat', 0),
-        "lon":        loc.get('lon', 0),
-        "maidenhead": loc.get('maidenhead', "N/A"),
+        "lat":        loc.get('lat', 51.4769),
+        "lon":        loc.get('lon', 0.0),
+        "maidenhead": loc.get('maidenhead', "IO81qm"),
         "system_msg": "System Ready."
     }
     
@@ -404,16 +388,16 @@ def get_telemetry():
             "state":      state_data.get("state",      orchestrator["state"]),
             "sub":        state_data.get("sub",        orchestrator["sub"]),
             "msg":        state_data.get("msg",        orchestrator["msg"]),
-            "flight_log": state_data.get("flight_log", orchestrator["flight_log"])
+            "flight_log": state_data.get("flight_log", orchestrator["flight_log"]),
+            "current_target": state_data.get("current_target", None)
         })
         
     ledger = load_json_file(LEDGER_FILE, {})
     last_audit = ledger.get("metadata", {}).get("last_updated", "N/A")
 
-    # Build postflight session block
     dusk_dt = get_dusk_utc(
-        loc.get('lat', 52.3874),
-        loc.get('lon', 4.6462),
+        loc.get('lat', 51.4769),
+        loc.get('lon', 0.0),
         loc.get('elevation', 0.0)
     )
     postflight = build_postflight(ledger, dusk_dt)
@@ -429,11 +413,10 @@ def get_telemetry():
         "weather":     weather,
         "science":     science,
         "orchestrator": orchestrator,
-        "hardware":    HW_CACHE["data"],  # battery, temp_c, link_status, storage_mb
+        "hardware":    HW_CACHE["data"],
         "last_audit":  last_audit,
         "postflight":  postflight,
     })
 
-# SeeVar-v5-M5-dashboard
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5050, debug=False)

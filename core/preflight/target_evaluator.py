@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-core/preflight/target_evaluator.py
-Version: 1.0.1
+Filename: core/preflight/target_evaluator.py
+Version: 1.0.2
 Objective: Audits the nightly plan for freshness and quantity to update dashboard UI.
 """
 
@@ -11,9 +11,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 class TargetEvaluator:
     def __init__(self):
-        self.base_dir = Path(os.path.expanduser("~/seevar/data"))
+        self.base_dir = PROJECT_ROOT / "data"
         self.observable_path = self.base_dir / "targets" / "observable_targets.json"
         self.plan_path = self.base_dir / "tonights_plan.json"
 

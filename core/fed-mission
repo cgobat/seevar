@@ -1,6 +1,9 @@
 #!/bin/bash
-# S30-PRO Federation: Mission Control Loop (v2.6.0)
+# =============================================================================
+# Filename: core/fed-mission
+# Version: 2.6.1
 # Objective: Full cycle automation including Postflight FITS Verification.
+# =============================================================================
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT" || exit

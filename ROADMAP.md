@@ -1,7 +1,7 @@
 🗺️ S30-PRO Development Roadmap: The Rommeldam Epic
 
 > **Objective:** Tracks the architectural journey and future versioning milestones of the Seestar Federation, mapped to the characters of Marten Toonder's universe.
-> **Version:** 1.3.0 (Oene — Clean Slate)
+> **Version:** 1.5.0 (Fliep)
 
 This document outlines the architectural journey of the S30-PRO autonomous observatory, structurally mapped to the characters of Marten Toonder's universe.
 
@@ -24,40 +24,93 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
 * **v1.5 Humpie:** Storage and wear strategy. OS on SD, app and data on RAID1 USB array, live state in RAM (/dev/shm), NAS failover via rsync.
 * **v1.6 Jochem:** Giving the background workers a bigger role. Cadence filter, ledger_manager, fleet_mapper sovereign TCP, full simulation end-to-end confirmed S1–S7 and T1–T7.
 * **v1.7 Oene:** **The Clean Slate Milestone (March 2026).** Full reinstallation verified on fresh Bookworm SD card.
-  - bootstrap.sh v1.2.1 — single `bash <(curl ...)` install, .venv, telescope questionnaire, auto-start services
-  - config.toml.example v2.0.0 — all sections complete, maidenhead-based NAS detection
+  - bootstrap.sh v1.3.1 — user-level systemd, GPS service, clear-outside-apy, horizon mask seeded
+  - config.toml.example v2.0.0 — all sections complete, [weather] thresholds, [knmi] section, cadence config
   - INSTALL.md — tester-facing installation guide
   - AAVSO Extended Format reporter v1.2.0 — full 15-field format, WebObs 2.0 preview tested
   - JD header added to sovereign_stamp in pilot.py
   - BRIDGE LED removed from dashboard (ALP retired)
   - Flat horizon mask (15° all-round) seeded at install — replaced at first light
-  - README.md beta notice and curl one-liner
-  - Seed catalog: 442 targets + reference stars (40°–60°N)
-  - Testers: Arenda (tester #1), SD card ready
+  - horizon.py v2.0.0 — per-degree profile, linear interpolation, best_windows()
+  - weather.py v1.7.0 — tri-source consensus: open-meteo + Clear Outside + KNMI EDR
+  - Weather evaluates only within astronomical dark window (skyfield)
+  - KNMI EDR API — measured cloud oktas, visibility, present weather from Schiphol
+  - ledger_manager.py v2.2.1 — dynamic 1/20th cadence from config.toml
+  - hardware_loader.py v1.1.0 — Alpaca UDP discovery + HTTP fingerprint (FIRST LIGHT REQUIRED)
+  - dashboard.py — config path fixed (seestar_organizer fossil removed)
+  - GPLv3 LICENSE added — cgobat's recommendation accepted
+  - CONTRIBUTING.md — public facing, Asthonising Automated Variable Star Observatory tagline
+  - GitHub topics, description, INSTALL one-liner
+  - Testers: Arenda (tester #1), Boyce-Astro introduction, Metius presentation
 
 ---
 
 ## 🌲 Epoch 1: Het Kleine Volkje (v1.x)
 *The invisible, tireless workers in the background. Focuses on system resilience and background magic.*
 
-* **v1.8 Snotolf:** **The Horizon Mapper.** An authentic, slightly spicy underlying system change.
+* **v1.8 Snotolf:** **The Hardware Whisperer.** An authentic, slightly spicy underlying system change.
+  - ✅ Weather veto wired into orchestrator _run_idle — RAIN/FOGGY/CLOUDY/WINDY abort session
+  - ✅ link_status wired from orchestrator telemetry into dashboard (WAITING → ONLINE at first light)
+  - Hardware auto-detection via Alpaca UDP + HTTP fingerprint — confirm FIRST LIGHT markers
   - Camera-based automatic horizon profiling at first light
-  - S30-Pro pans 360° at low altitude during session init
-  - pilot.py captures frames, skyline extracted per azimuth degree
-  - Writes `data/horizon_mask.json` with `source: camera_scan`
-  - horizon.py picks it up automatically — no user action required
-  - Flat frames pipeline (currently darks only)
+    - S30-Pro pans 360° at low altitude during session init
+    - pilot.py captures frames, skyline extracted per azimuth degree
+    - Writes `data/horizon_mask.json` with `source: camera_scan`
+    - horizon.py picks it up automatically — no user action required
+  - Flat frames pipeline (currently darks only) — peer review confirmed gap
+  - Dew heater control — 1% steps via ZWO API, driven by KNMI rh + temp delta
+  - Pi Zero 2W / CM5 inside Seestar — sovereign at silicon level (research phase)
+  - All-sky camera — wide angle, one frame/min, cloud cover from brightness variance
+  - INA219 power monitoring — current draw, motor stall detection
+  - GPS on one Seestar, broadcast fix over LAN to all federation instances
+  - Weather forced refresh at dusk — sentinel wakes 30min before dark window
+  - **G1/G2 green channel balance diagnostic** — peer review (March 2026)
+    - IMX585 GRBG pattern has two green pixels per Bayer quad
+    - `bayer_photometry.py`: add `check_green_balance()` — run once per session on bright star
+    - Log G1/G2 ratio; if consistently >1% apply as calibration constant
+    - Systematic offset would introduce photometry bias across all frames
 
-* **v1.9 Fliep:** **The Deployment Master.**
+* **v1.9 Fliep:** **The Deployment Master — Global Edition.**
   - `config_wizard.py` — re-runnable interactive config tool using tomli_w
   - Kiosk display service (Pi 4 — Pi 3 too slow)
-  - `catalog_localiser.py` — latitude check, pulls extra objects and reference charts for tester's sky
+  - KNMI waarschuwingen-nederland-48h — weather warnings as hard abort trigger
+
+  **Southern Hemisphere Support:**
+  - `hemisphere` flag in config.toml (`northern` / `southern`, auto-detected from lat)
+  - Westward priority flips to Eastward in Southern hemisphere (targets transit North)
+  - `catalog_localiser.py` — declination-band aware, pulls targets for observer's actual sky
+    - Northern: 40°–60°N seed catalog (current)
+    - Southern: 20°–50°S catalog to be built
+    - Equatorial: 20°S–20°N overlap band
+  - Weather sources — regional selection based on location:
+    - Netherlands: KNMI EDR (current)
+    - Australia/NZ: BOM API
+    - South Africa: SAWS
+    - Elsewhere: open-meteo + Clear Outside only (always available)
+  - Moon avoidance — Southern hemisphere moon rises in North, avoidance logic correct but
+    azimuth labelling needs hemisphere awareness
+  - Dashboard flight window — local time display correct globally via astimezone()
+
+  **General Deployment Gaps:**
+  - `clear-outside-apy` — coverage limited to Europe/N.America, fallback needed for other regions
+  - bootstrap.sh — add hemisphere auto-detection from lat, warn if Southern
+  - INSTALL.md — Southern hemisphere section
+  - Bortle map — current default (8) is Haarlem-specific, config wizard should prompt
+  - Timezone handling — all internal times UTC, display times via tzlocal (correct globally)
+  - astrometry index files — FOV-matched, correct globally but download guidance
+    needs updating for S30/S50 in Southern sky (different bright star density)
+  - First light checklist — hemisphere-specific verification steps
 
 ---
 
 ## ☕ Epoch 2: The Women of Rommeldam (v2.x)
 *The caretakers and organizers. Focuses on bringing order, analysis, and presentation to the raw data.*
 * **v2.0 Anne Marie Doddel:** **The Hardened Observatory.** Real-time photometric analysis, hardware hardening, and beautiful AAVSO light-curves. First light with Wilhelmina (S30-Pro, April 2026).
+  - Vignetting correction — flat-field pipeline fully operational, per-frame correction in `aperture_flux`
+  - G1/G2 balance constant applied if diagnostic confirms imbalance > 1%
+  - `numba @jit` benchmark on `aperture_flux` mask operations — peer review suggestion
+    - Target: 2-5x speedup on Pi 5 when processing hundreds of comp stars per frame
+    - Benchmark against numpy baseline on real IMX585 frames
 * **v2.1 Anne-Miebetje:** The classic first sub-version refinement.
 * **v2.2 Wobbe:** A highly stable, technical build.
 * **v2.3 Wolle:** Dedicated to visual graph and plot updates.

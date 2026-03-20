@@ -1,18 +1,14 @@
 [Unit]
-Description=SeeVar WeatherSentinel Daemon
+Description=SeeVar Weather Sentinel
 After=network.target
-Wants=network-online.target
 
 [Service]
 Type=simple
-User=ed
-WorkingDirectory=/home/ed/seevar
-# Adjust the python path if you are using a specific pyenv/venv!
-ExecStart=/usr/bin/env python3 /home/ed/seevar/core/preflight/weather.py
+WorkingDirectory=%h/seevar
+Environment=PYTHONPATH=%h/seevar
+ExecStart=%h/seevar/.venv/bin/python3 core/preflight/weather.py
 Restart=always
 RestartSec=30
-StandardOutput=journal
-StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

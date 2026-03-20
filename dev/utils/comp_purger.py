@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Filename: /home/ed/seevar/utils/comp_purger.py
-Version: 1.1.0
+Filename: dev/utils/comp_purger.py
+Version: 1.1.1
 Objective: Prunes orphaned comparison star charts in the SeeVar catalog.
 """
 
@@ -13,8 +13,8 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 logger = logging.getLogger("Janitor")
 
-# Hardcoded for SeeVar Diamond Revision stability
-REF_DIR = Path("/home/ed/seevar/catalogs/reference_stars")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REF_DIR = PROJECT_ROOT / "catalogs" / "reference_stars"
 
 def purge_fluff():
     if not REF_DIR.exists():

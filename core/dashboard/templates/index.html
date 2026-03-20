@@ -32,7 +32,7 @@
         .label { color: var(--text-muted); width: 45%; }
         .val { color: var(--text-bright); text-align: left; flex: 1; }
         
-        .target-card { border-top: 1px dashed #333; padding-top: 15px; margin-top: 15px; } /* target-card-patched */
+        .target-card { border-top: 1px dashed #333; padding-top: 15px; margin-top: 15px; } 
         .target-card .row { margin-bottom: 8px; }
         .target-card .label { width: 30%; color: #aaa; }
         
@@ -60,32 +60,23 @@
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .critical { color: var(--neon-purple) !important; text-shadow: 0 0 8px var(--purple-glow), 0 0 12px var(--purple-glow); background: none !important; }
 
-        .bottom-bar { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #333; padding-top: 15px; margin-top: 20px; font-size: 0.85em; }
-        .hw-stats { display: flex; flex-direction: column; gap: 8px; font-weight: bold; width: 250px;}
-        .stat-line { display: flex; align-items: center; }
-        .stat-label { color: var(--text-muted); width: 80px; }
         .stat-val { color: var(--led-green); }
         .batt-warn { color: var(--led-orange) !important; }
         .batt-crit { color: var(--alert-red) !important; animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        .flight-log-container { flex: 1; display: flex; flex-direction: column; gap: 4px; border-left: 1px dashed #333; padding-left: 20px; margin-left: 20px; height: 80px; overflow: hidden; justify-content: flex-end;}
+        .flight-log-container { display: flex; flex-direction: column; gap: 4px; border-top: 1px dashed #333; padding-top: 15px; margin-top: 15px; height: 100px; overflow: hidden; justify-content: flex-end;}
         .log-line { color: var(--text-muted); font-size: 0.9em; white-space: nowrap; }
         .log-line.latest { color: var(--text-bright); font-weight: bold; }
-
-        .siril-box { background: #111; padding: 10px; font-size: 0.75em; color: #aaa; border: 1px solid #222; margin-top: 15px; min-height: 100px; display: flex; flex-direction: column; gap: 4px; }
-        .siril-line { border-bottom: 1px solid #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         @media (max-width: 900px) {
             body { padding: 5px; }
             .swipe-hint { display: block; }
             .container { overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 20px; -webkit-overflow-scrolling: touch; gap: 10px; }
             .panel { min-width: 93vw; scroll-snap-align: center; flex-shrink: 0; padding: 15px; }
-            .bottom-bar { flex-direction: column; align-items: flex-start; gap: 15px; }
             .flight-log-container { border-left: none; border-top: 1px dashed #333; padding-left: 0; margin-left: 0; padding-top: 10px; width: 100%; height: auto;}
         }
 
-        /* --- Postflight log table --- */
         .pf-scoreboard { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #333; }
         .pf-score-cell { text-align: center; }
         .pf-score-num  { font-size: 1.5em; font-weight: 900; letter-spacing: 1px; line-height: 1; }
@@ -126,7 +117,7 @@
 </head>
 <body>
     <div class="top-bar">
-        <span id="telemetry-mh">JO22hj</span>
+        <span id="telemetry-mh">--</span>
         <span>JDATE: <span id="live-jdate">CALCULATING...</span></span>
     </div>
     <div class="swipe-hint">⟸ SWIPE PANELS ⟹</div>
@@ -139,6 +130,9 @@
             <div class="row"><span class="label">GPS (LOCK)</span> <span class="val"></span> <div class="led green"></div></div>
             <div class="row"><span class="label">WEATHER (PRED)</span> <span id="weather-val" class="val">CLEAR</span> <div id="weather-icon-led" class="led weather-icon">⭐</div></div>
             <div class="row"><span class="label">FOG (VIS)</span> <span class="val">DISCONNECTED</span> <div class="led blue-grey"></div></div>
+            
+            <div class="row"><span class="label">BATTERY</span> <span id="bb-batt" class="val stat-val">--%</span></div>
+            <div class="row"><span class="label">STORAGE</span> <span id="bb-store" class="val stat-val">-- MB</span></div>
             
             <div class="target-card">
                 <div class="row" style="padding-bottom: 5px;">
@@ -211,20 +205,14 @@
                 <span class="pf-footer-note" id="pf-footer-note">session since dusk</span>
                 <span class="pf-overall o-grey" id="pf-overall">--</span>
             </div>
-        </div>
-    </div>
 
-    <div class="bottom-bar">
-        <div class="hw-stats">
-            <div class="stat-line"><span class="stat-label">🔋 BATT</span> <span id="bb-batt" class="stat-val">--%</span></div>
-            <div class="stat-line"><span class="stat-label">💾 STOR</span> <span id="bb-store" class="stat-val">-- MB</span></div>
-        </div>
-        <div class="flight-log-container" id="flight-log">
-            <div class="log-line latest">⏳ Hardware link established. Awaiting flight directives...</div>
-            <div class="log-line"></div>
-            <div class="log-line"></div>
-            <div class="log-line"></div>
-            <div class="log-line"></div>
+            <div class="flight-log-container" id="flight-log">
+                <div class="log-line latest">⏳ Hardware link established. Awaiting flight directives...</div>
+                <div class="log-line"></div>
+                <div class="log-line"></div>
+                <div class="log-line"></div>
+                <div class="log-line"></div>
+            </div>
         </div>
     </div>
 
@@ -284,8 +272,7 @@
                         document.getElementById('orch-sub').innerText = data.orchestrator.sub || 'OFF-DUTY';
                         document.getElementById('orch-msg').innerText = data.orchestrator.msg || '';
 
-                        // SeeVar-current-target-lock: freeze ticker on active target
-                        const ct = data.current_target;
+                        const ct = data.orchestrator.current_target;
                         if(ct && ct.name) {
                             document.getElementById('t-name').innerText = ct.name;
                             document.getElementById('t-name').className = 'val critical';
@@ -306,7 +293,6 @@
                         const icon = document.getElementById('orch-icon');
                         const mainText = document.getElementById('orch-main');
                         
-                        // SeeVar-state-icons-v2
                         if(state === 'PARKED') {
                             icon.innerText = 'P'; icon.className = 'icon-p state-parked'; mainText.style.color = '#1e90ff';
                         } else if(state === 'IDLE') {
@@ -361,12 +347,12 @@
                         const batt = data.hardware.battery;
                         if (batt !== "N/A") {
                             battTxt.innerText = batt + "%";
-                            if (parseInt(batt) > 30) battTxt.className = "stat-val";
-                            else if (parseInt(batt) > 15) battTxt.className = "stat-val batt-warn";
-                            else battTxt.className = "stat-val batt-crit";
+                            if (parseInt(batt) > 30) battTxt.className = "val stat-val";
+                            else if (parseInt(batt) > 15) battTxt.className = "val stat-val batt-warn";
+                            else battTxt.className = "val stat-val batt-crit";
                         } else {
                             battTxt.innerText = "--%";
-                            battTxt.className = "stat-val batt-crit";
+                            battTxt.className = "val stat-val batt-crit";
                         }
 
                         const rawMb = parseFloat(data.hardware.storage_mb);
@@ -377,7 +363,6 @@
                         const pf = data.postflight;
                         const sb = pf.scoreboard || {};
 
-                        // Scoreboard
                         const sched    = sb.scheduled || 0;
                         const attempt  = sb.attempted  || 0;
                         const observed = sb.observed   || 0;
@@ -399,7 +384,6 @@
                         failEl.innerText = failed;
                         failEl.className = failed > 0 ? 'pf-score-num s-orange' : 'pf-score-num s-dim';
 
-                        // LED indicators
                         const photLed = document.getElementById('led-phot');
                         const photVal = document.getElementById('pf-phot-val');
                         photLed.className = 'led ' + (pf.phot_led || 'grey');
@@ -412,7 +396,6 @@
                         aavsoVal.className  = 'pf-led-val' + (pf.aavso_led === 'green' ? ' v-green' : pf.aavso_led === 'orange' ? ' v-orange' : '');
                         aavsoVal.innerText  = pf.aavso_led === 'green' ? 'SUBMITTED' : pf.aavso_led === 'orange' ? 'PENDING' : '--';
 
-                        // Overall status badge
                         const overallEl = document.getElementById('pf-overall');
                         if (pf.overall === 'green') {
                             overallEl.className = 'pf-overall o-green';
@@ -425,11 +408,10 @@
                             overallEl.innerText = 'WAITING';
                         }
 
-                        // Log rows
                         const logBody = document.getElementById('pf-log-body');
                         const rows = pf.log || [];
                         if (rows.length === 0) {
-                            logBody.innerHTML = '<div style="color:#444;font-size:0.75em;padding:8px 6px;grid-column:1/-1;">no observations this session</div>'; /* cosmetics_patched */
+                            logBody.innerHTML = '<div style="color:#444;font-size:0.75em;padding:8px 6px;grid-column:1/-1;">no observations this session</div>'; 
                         } else {
                             logBody.innerHTML = rows.map(r => {
                                 const magClass = r.row_class === 'fail' ? ' m-fail' : r.row_class === 'warn' ? ' m-warn' : '';
@@ -443,7 +425,6 @@
                             }).join('');
                         }
 
-                        // Footer note
                         document.getElementById('pf-footer-note').innerText =
                             rows.length + ' of ' + attempt + ' · session since dusk';
                     }

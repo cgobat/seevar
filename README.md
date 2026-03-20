@@ -1,4 +1,4 @@
-# 🔭 SeeVar — Automated Variable Star Observatory
+# 🔭 SeeVar —Asthonising Automated Variable Star Observatory
 
 ![SeeVar Mascot](SeeVar.jpg)
 

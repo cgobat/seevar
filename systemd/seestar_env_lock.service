@@ -1,0 +1,19 @@
+[Unit]
+Description=Federation Environment Guardian (v1.5.6 - Armored Stake)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/seevar
+ExecStart=/usr/bin/env python3 %h/seevar/core/utils/env_vampire_hunter.py
+StandardOutput=append:%h/seevar/logs/guardian_debug.log
+StandardError=append:%h/seevar/logs/guardian_debug.log
+RemainAfterExit=yes
+
+Restart=on-failure
+RestartSec=30
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=default.target

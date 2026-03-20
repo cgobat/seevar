@@ -1,0 +1,14 @@
+[Unit]
+Description=SeeVar Continuous GPS Monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 %h/seevar/core/utils/gps_monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

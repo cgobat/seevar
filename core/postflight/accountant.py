@@ -2,25 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/postflight/accountant.py
-Version: 2.0.0
-Objective: Sweeps local_buffer, runs full Bayer differential photometry via
-           calibration_engine, and stamps complete results into the ledger.
-
-Ledger schema v2 per target:
-    status          : PENDING | OBSERVED | FAILED_QC | FAILED_QC_LOW_SNR |
-                      FAILED_SATURATED | FAILED_NO_WCS | ERROR
-    last_success    : ISO8601 UTC timestamp of last successful observation
-    attempts        : total attempts including failures
-    priority        : NORMAL | HIGH | URGENT (set externally by planner)
-    last_mag        : differential magnitude (float)
-    last_err        : magnitude error (float)
-    last_snr        : target SNR (float)
-    last_filter     : photometric filter string e.g. "TG"
-    last_comps      : number of comparison stars used (int)
-    last_zp         : ensemble zero point (float)
-    last_zp_std     : zero point scatter (float)
-    last_obs_utc    : DATE-OBS from FITS header (ISO8601)
-    last_peak_adu   : peak pixel ADU of target
+Version: 2.0.1
+Objective: Sweeps local_buffer, runs full Bayer differential photometry via calibration_engine, and stamps complete results into the ledger.
 """
 
 import json
@@ -33,7 +16,7 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 
 import sys
-PROJECT_ROOT = Path("/home/ed/seevar")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.postflight.calibration_engine import CalibrationEngine

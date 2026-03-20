@@ -57,13 +57,18 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
     - pilot.py captures frames, skyline extracted per azimuth degree
     - Writes `data/horizon_mask.json` with `source: camera_scan`
     - horizon.py picks it up automatically — no user action required
-  - Flat frames pipeline (currently darks only)
+  - Flat frames pipeline (currently darks only) — peer review confirmed gap
   - Dew heater control — 1% steps via ZWO API, driven by KNMI rh + temp delta
   - Pi Zero 2W / CM5 inside Seestar — sovereign at silicon level (research phase)
   - All-sky camera — wide angle, one frame/min, cloud cover from brightness variance
   - INA219 power monitoring — current draw, motor stall detection
   - GPS on one Seestar, broadcast fix over LAN to all federation instances
   - Weather forced refresh at dusk — sentinel wakes 30min before dark window
+  - **G1/G2 green channel balance diagnostic** — peer review (March 2026)
+    - IMX585 GRBG pattern has two green pixels per Bayer quad
+    - `bayer_photometry.py`: add `check_green_balance()` — run once per session on bright star
+    - Log G1/G2 ratio; if consistently >1% apply as calibration constant
+    - Systematic offset would introduce photometry bias across all frames
 
 * **v1.9 Fliep:** **The Deployment Master — Global Edition.**
   - `config_wizard.py` — re-runnable interactive config tool using tomli_w
@@ -101,6 +106,11 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
 ## ☕ Epoch 2: The Women of Rommeldam (v2.x)
 *The caretakers and organizers. Focuses on bringing order, analysis, and presentation to the raw data.*
 * **v2.0 Anne Marie Doddel:** **The Hardened Observatory.** Real-time photometric analysis, hardware hardening, and beautiful AAVSO light-curves. First light with Wilhelmina (S30-Pro, April 2026).
+  - Vignetting correction — flat-field pipeline fully operational, per-frame correction in `aperture_flux`
+  - G1/G2 balance constant applied if diagnostic confirms imbalance > 1%
+  - `numba @jit` benchmark on `aperture_flux` mask operations — peer review suggestion
+    - Target: 2-5x speedup on Pi 5 when processing hundreds of comp stars per frame
+    - Benchmark against numpy baseline on real IMX585 frames
 * **v2.1 Anne-Miebetje:** The classic first sub-version refinement.
 * **v2.2 Wobbe:** A highly stable, technical build.
 * **v2.3 Wolle:** Dedicated to visual graph and plot updates.

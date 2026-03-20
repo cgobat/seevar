@@ -132,7 +132,7 @@ class MockDiamondSequence:
         timestamp = utc_obs.strftime("%Y%m%dT%H%M%S")
         out_path  = LOCAL_BUFFER / f"SIM_{safe_name}_{timestamp}_Raw.fits"
         
-        header = sovereign_stamp(target, utc_obs, width, height)
+        header = sovereign_stamp(target, utc_obs)
         write_fits(array, header, out_path)
         
         return FrameResult(success=True, path=out_path, width=width, height=height, elapsed_s=4.0)

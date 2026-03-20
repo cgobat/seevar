@@ -257,7 +257,7 @@ def _read_gps_ram() -> dict:
         return {"lat": lat, "lon": lon, "elevation": elev}
     except Exception: return {"lat": 0.0, "lon": 0.0, "elevation": 0.0}
 
-def sovereign_stamp(target: AcquisitionTarget, utc_obs: datetime, width: int, height: int, ccd_temp: Optional[float] = None) -> dict:
+def sovereign_stamp(target: AcquisitionTarget, utc_obs: datetime, ccd_temp: Optional[float] = None) -> dict:
     ra_deg = target.ra_hours * 15.0
     t_astropy = Time(utc_obs)
 
@@ -407,7 +407,7 @@ class DiamondSequence:
         safe_name = target.name.replace(" ", "_").replace("/", "-")
         out_path  = LOCAL_BUFFER / f"{safe_name}_{utc_obs.strftime('%Y%m%dT%H%M%S')}_Raw.fits"
 
-        header = sovereign_stamp(target, utc_obs, width, height, ccd_temp=ccd_temp)
+        header = sovereign_stamp(target, utc_obs, ccd_temp=ccd_temp)
         ok = write_fits(array, header, out_path)
         elapsed = time.monotonic() - t_start
 

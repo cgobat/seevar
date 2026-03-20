@@ -641,8 +641,6 @@ def _read_gps_ram() -> dict:
 def sovereign_stamp(
     target: AcquisitionTarget,
     utc_obs: datetime,
-    width: int,
-    height: int,
     ccd_temp: Optional[float] = None,
 ) -> dict:
     ra_deg = target.ra_hours * 15.0
@@ -1391,7 +1389,7 @@ class DiamondSequence:
                 n_frames=1,
                 integration_sec=target.integration_sec,
             )
-            header = sovereign_stamp(science_target, utc_obs, width, height, ccd_temp=ccd_temp)
+            header = sovereign_stamp(science_target, utc_obs, ccd_temp=ccd_temp)
             ok = write_fits(img, header, out_path)
             if not ok:
                 return FrameResult(success=False, error="FITS write failed")

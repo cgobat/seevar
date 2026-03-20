@@ -275,23 +275,7 @@ class MockDiamondSequence:
         ra_deg = target.ra_hours * 15.0
         dec_deg = target.dec_deg
 
-        header = fits.Header()
-        header["OBJECT"] = target.name
-        header["DATE-OBS"] = utc_obs.isoformat()
-        header["EXPTIME"] = target.exp_ms / 1000.0
-        header["EXPMS"] = int(target.exp_ms)
-        header["GAIN"] = int(GAIN)
-        header["CCD-TEMP"] = float(telemetry.temp_c if telemetry and telemetry.temp_c is not None else 22.5)
-        header["RA"] = float(ra_deg)
-        header["DEC"] = float(dec_deg)
-        header["CRVAL1"] = float(ra_deg)
-        header["CRVAL2"] = float(dec_deg)
-        header["CRPIX1"] = width / 2
-        header["CRPIX2"] = height / 2
-        header["CDELT1"] = -0.000305
-        header["CDELT2"] = 0.000305
-        header["CTYPE1"] = "RA---TAN"
-        header["CTYPE2"] = "DEC--TAN"
+        header = sovereign_stamp(target, utc_obs)
 
         self._draw_star(array, width / 2, height / 2, amplitude=15000)
 

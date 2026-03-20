@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/flight/exposure_planner.py
-Version: 1.0.1
-Objective: Estimate optimal exposure time for a target given magnitude, sky conditions and desired SNR. Feeds orchestrator exp_ms.
+Version: 1.1.0
+Objective: Estimate optimal exposure time for a target given magnitude, sky conditions,
+           desired SNR and field rotation limit. Three-way cap: SNR, saturation,
+           field rotation. Shortest wins. Feeds orchestrator exp_ms.
 """
 
 import math
 from dataclasses import dataclass
 from typing import Optional
+
+from core.flight.field_rotation import max_exposure_s as _field_rotation_max
 
 # ---------------------------------------------------------------------------
 # IMX585 / S30-Pro sensor constants
@@ -107,6 +111,10 @@ def plan_exposure(
     sky_bortle: int = DEFAULT_BORTLE,
     target_snr: float = TARGET_SNR,
     fwhm_pix: Optional[float] = None,
+    az_deg: Optional[float] = None,
+    alt_deg: Optional[float] = None,
+    lat_deg: Optional[float] = None,
+    pixscale_arcsec: float = PIXEL_SCALE,
 ) -> ExposurePlan:
     sky_e_s    = BORTLE_SKY_E_S.get(sky_bortle, BORTLE_SKY_E_S[DEFAULT_BORTLE])
     source_e_s = _source_rate(target_mag)
@@ -117,6 +125,15 @@ def plan_exposure(
 
     saturates = t_sat < t_recommended
     if saturates: t_recommended = max(MIN_EXP_SEC, t_sat * 0.5)
+
+    # Field rotation cap — alt-az smear limit
+    rotation_note = ""
+    if az_deg is not None and alt_deg is not None and lat_deg is not None:
+        rot = _field_rotation_max(az_deg, alt_deg, lat_deg, pixscale_arcsec)
+        if rot.max_exp_s < t_recommended:
+            t_recommended = max(MIN_EXP_SEC, rot.max_exp_s)
+            rotation_note = f" | ROTATION CAP {rot.max_exp_s:.1f}s ({rot.note[:40]})"
+
     t_recommended = min(max(t_recommended, MIN_EXP_SEC), MAX_EXP_SEC)
     achieved_snr  = _snr(source_e_s, sky_e_s, n_pix, t_recommended)
 
@@ -125,7 +142,7 @@ def plan_exposure(
     elif achieved_snr < MIN_SNR:
         note = f"Target too faint for SNR>{MIN_SNR:.0f} within {MAX_EXP_SEC:.0f}s. Best SNR={achieved_snr:.1f} at {t_recommended:.0f}s."
     else:
-        note = f"Recommended: {t_recommended:.1f}s for SNR={achieved_snr:.0f} (Bortle {sky_bortle}, mag {target_mag:.1f})"
+        note = f"Recommended: {t_recommended:.1f}s for SNR={achieved_snr:.0f} (Bortle {sky_bortle}, mag {target_mag:.1f}){rotation_note}"
 
     return ExposurePlan(
         target_mag=target_mag, exp_sec=round(t_recommended, 1), exp_ms=int(t_recommended * 1000),

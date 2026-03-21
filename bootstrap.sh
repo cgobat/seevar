@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # Filename:  bootstrap.sh
-# Version:   1.3.1
+# Version:   1.3.2
 # Objective: Install SeeVar on fresh Debian Bookworm (Raspberry Pi).
 #            Creates Python .venv, installs dependencies, runs interactive
 #            questionnaire for telescope and site configuration, installs
@@ -172,6 +172,11 @@ REQUIREMENTS
 
 function create_directory_structure {
   section "Creating data directory structure"
+
+  if [ -L "$SEEVAR_DIR/data" ] && [ ! -d "$SEEVAR_DIR/data" ]; then
+    warn "Dangling 'data' symlink detected. Removing it to fall back to local storage."
+    rm "$SEEVAR_DIR/data"
+  fi
 
   mkdir -p "$SEEVAR_DIR/data/local_buffer"
   mkdir -p "$SEEVAR_DIR/data/archive"

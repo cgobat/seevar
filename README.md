@@ -220,3 +220,7 @@ A small telescope, a Raspberry Pi, and careful automation can produce **real sci
 
 The sky has always been open to anyone willing to measure it.
 
+---
+
+"De kosmos is erg groot, en voor een heer alleen is zij eigenlijk te veel. Maar met een groot denkraam komt men een heel eind."
+(Vrij naar Heer Bommel)

@@ -1,11 +1,13 @@
 #!/bin/bash
 # =============================================================================
 # Filename:  bootstrap.sh
-# Version:   1.3.2
+# Version:   1.4.0
 # Objective: Install SeeVar on fresh Debian Bookworm (Raspberry Pi).
 #            Creates Python .venv, installs dependencies, runs interactive
 #            questionnaire for telescope and site configuration, installs
-#            user-level systemd services, and verifies the environment.
+#            user-level systemd services, runs initial full preflight pipeline
+#            (fetcher -> librarian -> nightly_planner -> schedule_compiler),
+#            and verifies the environment.
 # =============================================================================
 
 set -e
@@ -427,7 +429,7 @@ SVCEOF
 }
 
 # -----------------------------------------------------------------------------
-# FETCH TARGETS
+# FETCH TARGETS (Step 1 of preflight — AAVSO haul only)
 # -----------------------------------------------------------------------------
 
 function fetch_targets {
@@ -440,6 +442,42 @@ function fetch_targets {
   "$PYBIN" core/preflight/aavso_fetcher.py \
     && info "Target catalog populated." \
     || warn "aavso_fetcher.py returned an error — seed catalog will be used instead."
+}
+
+# -----------------------------------------------------------------------------
+# INITIAL PREFLIGHT PIPELINE
+# Runs the full preflight chain so tonights_plan.json and ssc_payload.json
+# are ready immediately after install — no manual run required.
+# Mirrors daily_preflight.sh. Safe to re-run (all steps are idempotent).
+# -----------------------------------------------------------------------------
+
+function run_initial_preflight {
+  section "Running initial preflight pipeline"
+
+  local PYBIN="$VENV/bin/python3"
+  cd "$SEEVAR_DIR"
+
+  info "Step 1/4 — Librarian: building federation catalog..."
+  "$PYBIN" core/preflight/librarian.py \
+    && info "Federation catalog ready." \
+    || { warn "librarian.py returned an error — check logs/librarian.log"; }
+
+  info "Step 2/4 — Cadence Auditor: cross-referencing ledger..."
+  "$PYBIN" core/preflight/audit.py \
+    && info "Cadence audit complete." \
+    || { warn "audit.py returned an error — check logs/audit.log"; }
+
+  info "Step 3/4 — Nightly Planner: filtering by horizon/altitude/cadence..."
+  "$PYBIN" core/preflight/nightly_planner.py \
+    && info "tonights_plan.json ready." \
+    || { warn "nightly_planner.py returned an error — check logs/nightly_planner.log"; }
+
+  info "Step 4/4 — Schedule Compiler: generating SSC payload..."
+  "$PYBIN" core/preflight/schedule_compiler.py \
+    && info "ssc_payload.json ready." \
+    || { warn "schedule_compiler.py returned an error — check logs/schedule_compiler.log"; }
+
+  info "Initial preflight pipeline complete — observatory is ready."
 }
 
 # -----------------------------------------------------------------------------
@@ -494,7 +532,7 @@ function print_banner {
 │            SeeVar Installation Complete             │
 │                                                     │
 │  Services started — waiting for astronomical night. │
-│  AAVSO target catalog is being fetched now.         │
+│  Tonight's flight plan is loaded and ready.         │
 │                                                     │
 │  When your telescope joins the network:             │
 │    1. Set its IP in config.toml [[seestars]]        │
@@ -527,6 +565,7 @@ function setup {
   telescope_questionnaire
   systemd_service_setup
   fetch_targets
+  run_initial_preflight
   sanity_check
   print_banner
 }

@@ -2,8 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 Filename: core/flight/pilot.py
-Version: 1.6.2
-Objective: Direct TCP control of ZWO S30-Pro for AAVSO-compliant Sovereign RAW acquisition. Dynamically routes network IP from config.
+Version: 1.7.0
+Objective: Direct TCP control of ZWO S30-Pro for AAVSO-compliant Sovereign RAW
+           acquisition. Dynamically routes network IP from config.
+           v1.7.0: ControlSocket hardened — send() returns Tuple[bool, int],
+           recv_response() is ID-matched and drops unsolicited Event telemetry,
+           eliminating stray PiStatus/ViewState race conditions on port 4700.
 """
 
 import json
@@ -62,9 +66,10 @@ APERTURE        = 30            # mm
 PIXSCALE        = 3.74          # arcsec/pixel
 RDNOISE         = 1.6           # IMX585 read noise estimate (e-)
 PEDESTAL        = 0             # No pedestal applied
-SWCREATE        = "SeeVar v5.0.0"
+SWCREATE        = "SeeVar v1.7.0"
 
-SETTLE_SECONDS  = 8             # Post-slew settle time
+SETTLE_SECONDS  = 8             # Post-slew settle — FIRST LIGHT: replace with
+                                # wait_for_event() once event names confirmed
 FRAME_TIMEOUT   = 60            # Max wait for preview frame (seconds)
 EXP_MS_DEFAULT  = 5000          # Default exposure ms
 
@@ -152,7 +157,7 @@ class TelemetryBlock:
 def recv_exact(sock: socket.socket, n: int) -> Optional[bytes]:
     try: data = sock.recv(n, socket.MSG_WAITALL)
     except socket.timeout: return None
-    except socket.error as e: return None
+    except socket.error: return None
     if data is None or len(data) == 0 or len(data) != n: return None
     return data
 
@@ -161,16 +166,31 @@ def parse_header(header: bytes) -> Tuple[int, int, int, int]:
     try:
         _s1, _s2, _s3, size, _s5, _s6, code, frame_id, width, height = struct.unpack(HEADER_FMT, header[:20])
         return size, frame_id, width, height
-    except struct.error as e: return 0, 0, 0, 0
+    except struct.error: return 0, 0, 0, 0
 
 # ---------------------------------------------------------------------------
-# Control & Image Sockets (TCP)
+# Control Socket (TCP — port 4700)
 # ---------------------------------------------------------------------------
 
 class ControlSocket:
+    """
+    JSON-RPC client for port 4700.
+
+    Port 4700 is a stateful event stream. The telescope pushes unsolicited
+    telemetry (PiStatus, ViewState, etc.) on the same connection as command
+    responses. recv_response() loops the stream and matches by cmd_id,
+    dropping all unsolicited Event packets. This eliminates the race
+    condition where a stray Event is mistaken for a command ACK.
+
+    send()        → Tuple[bool, int]  (ok, cmd_id)
+    recv_response → ID-matched, Event-filtered
+    send_and_recv → convenience wrapper
+    """
+
     def __init__(self, host: str = SEESTAR_HOST, port: int = CTRL_PORT, timeout: float = 15.0):
         self.host, self.port, self.timeout = host, port, timeout
-        self._sock, self._cmdid = None, 10000
+        self._sock: Optional[socket.socket] = None
+        self._cmdid: int = 10000
 
     def connect(self) -> bool:
         try:
@@ -179,7 +199,8 @@ class ControlSocket:
             s.connect((self.host, self.port))
             self._sock = s
             return True
-        except socket.error: return False
+        except socket.error:
+            return False
 
     def disconnect(self):
         if self._sock:
@@ -194,30 +215,85 @@ class ControlSocket:
     def __exit__(self, *_):
         self.disconnect()
 
-    def send(self, method: str, params=None) -> bool:
-        if self._sock is None: return False
-        msg = {"id": self._cmdid, "method": method}
-        if params is not None: msg["params"] = params
+    def send(self, method: str, params=None) -> Tuple[bool, int]:
+        """
+        Send a JSON-RPC command.
+        Returns (True, cmd_id) on success, (False, -1) on failure.
+        cmd_id is used by recv_response() to match the reply.
+        """
+        if self._sock is None:
+            return False, -1
+        cmd_id = self._cmdid
+        msg = {"id": cmd_id, "method": method}
+        if params is not None:
+            msg["params"] = params
         self._cmdid += 1
         try:
             self._sock.sendall((json.dumps(msg) + "\r\n").encode("utf-8"))
-            return True
-        except socket.error: return False
+            return True, cmd_id
+        except socket.error:
+            return False, -1
 
-    def recv_response(self) -> Optional[dict]:
-        if self._sock is None: return None
+    def recv_response(self, expected_id: int) -> Optional[dict]:
+        """
+        Read the port 4700 stream until the response matching expected_id
+        is found. Unsolicited Event packets are logged at DEBUG and discarded.
+        Returns None on timeout, connection loss, or send failure (expected_id == -1).
+        """
+        if self._sock is None or expected_id == -1:
+            return None
+
         buf = b""
+        deadline = time.monotonic() + self.timeout
+
         try:
-            while b"\r\n" not in buf:
-                chunk = self._sock.recv(4096)
-                if not chunk: break
+            while time.monotonic() < deadline:
+                try:
+                    chunk = self._sock.recv(4096)
+                except socket.timeout:
+                    continue
+                if not chunk:
+                    break
                 buf += chunk
-            return json.loads(buf.split(b"\r\n")[0].decode("utf-8"))
-        except (socket.error, json.JSONDecodeError): return None
+
+                while b"\r\n" in buf:
+                    line, buf = buf.split(b"\r\n", 1)
+                    if not line:
+                        continue
+                    try:
+                        msg = json.loads(line.decode("utf-8"))
+                    except json.JSONDecodeError:
+                        continue
+
+                    # Unsolicited telemetry — drop and keep waiting
+                    if "Event" in msg:
+                        logger.debug("Dropping unsolicited Event: %s", msg.get("Event"))
+                        continue
+
+                    # Matched response
+                    if msg.get("id") == expected_id:
+                        return msg
+
+                    # Response for a different cmd_id — log and discard
+                    logger.debug("Dropping stale response id=%s (expected %d)",
+                                 msg.get("id"), expected_id)
+
+        except socket.error as e:
+            logger.warning("ControlSocket recv error: %s", e)
+
+        logger.warning("recv_response timed out waiting for id=%d", expected_id)
+        return None
 
     def send_and_recv(self, method: str, params=None) -> Optional[dict]:
-        if not self.send(method, params): return None
-        return self.recv_response()
+        """Send command and return the matched response. Returns None on failure."""
+        ok, cmd_id = self.send(method, params)
+        if not ok:
+            return None
+        return self.recv_response(expected_id=cmd_id)
+
+# ---------------------------------------------------------------------------
+# Image Socket (TCP — port 4801)
+# ---------------------------------------------------------------------------
 
 class ImageSocket:
     def __init__(self, host: str = SEESTAR_HOST, port: int = IMG_PORT, timeout: float = FRAME_TIMEOUT):
@@ -228,7 +304,8 @@ class ImageSocket:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
             sock.connect((self.host, self.port))
-        except socket.error as e: return None, 0, 0
+        except socket.error:
+            return None, 0, 0
 
         deadline = time.monotonic() + self.timeout
         try:
@@ -237,68 +314,89 @@ class ImageSocket:
                 if header is None: break
                 size, frame_id, width, height = parse_header(header)
                 if size < MIN_PAYLOAD: continue
-                
                 data = recv_exact(sock, size)
                 if data is None: break
                 if frame_id == FRAME_PREVIEW: return data, width, height
-        finally: sock.close()
+        finally:
+            sock.close()
         return None, 0, 0
 
 # ---------------------------------------------------------------------------
-# FITS construction 
+# FITS construction
 # ---------------------------------------------------------------------------
 
 def _read_gps_ram() -> dict:
-    import json
     try:
         data = json.loads(ENV_STATUS.read_text())
-        lat, lon, elev = float(data.get("lat", 0.0)), float(data.get("lon", 0.0)), float(data.get("elevation", 0.0))
+        lat  = float(data.get("lat",       0.0))
+        lon  = float(data.get("lon",       0.0))
+        elev = float(data.get("elevation", 0.0))
         return {"lat": lat, "lon": lon, "elevation": elev}
-    except Exception: return {"lat": 0.0, "lon": 0.0, "elevation": 0.0}
+    except Exception:
+        return {"lat": 0.0, "lon": 0.0, "elevation": 0.0}
 
-def sovereign_stamp(target: AcquisitionTarget, utc_obs: datetime, width: int, height: int, ccd_temp: Optional[float] = None) -> dict:
-    ra_deg = target.ra_hours * 15.0
-    t_astropy = Time(utc_obs)
+def sovereign_stamp(target: AcquisitionTarget, utc_obs: datetime,
+                    width: int, height: int,
+                    ccd_temp: Optional[float] = None) -> dict:
+    ra_deg     = target.ra_hours * 15.0
+    t_astropy  = Time(utc_obs)
 
     gps = _read_gps_ram()
     site_lat, site_lon, site_elev = gps["lat"], gps["lon"], gps["elevation"]
     gps_valid = not (site_lat == 0.0 and site_lon == 0.0)
 
-    airmass, moon_phase, moon_alt = None, None, None
+    airmass = moon_phase = moon_alt = None
     if gps_valid:
         try:
-            location = EarthLocation(lat=site_lat * u.deg, lon=site_lon * u.deg, height=site_elev * u.m)
-            frame = AltAz(obstime=t_astropy, location=location)
-            target_coord = SkyCoord(ra=ra_deg * u.deg, dec=target.dec_deg * u.deg, frame="icrs")
-            altaz = target_coord.transform_to(frame)
-            alt_deg = float(altaz.alt.deg)
-            if alt_deg > 0.0: airmass = round(1.0 / math.sin(math.radians(alt_deg)), 4)
+            location     = EarthLocation(lat=site_lat * u.deg,
+                                         lon=site_lon * u.deg,
+                                         height=site_elev * u.m)
+            frame        = AltAz(obstime=t_astropy, location=location)
+            target_coord = SkyCoord(ra=ra_deg * u.deg,
+                                    dec=target.dec_deg * u.deg, frame="icrs")
+            altaz        = target_coord.transform_to(frame)
+            alt_deg      = float(altaz.alt.deg)
+            if alt_deg > 0.0:
+                airmass = round(1.0 / math.sin(math.radians(alt_deg)), 4)
 
-            moon = get_body("moon", t_astropy, location)
-            moon_alt = round(float(moon.transform_to(frame).alt.deg), 2)
-            sun = get_body("sun", t_astropy, location)
-            sep = moon.separation(sun).deg
-            moon_phase = round(min(max((1.0 - math.cos(math.radians(sep))) / 2.0, 0.0), 1.0), 4)
-        except Exception: pass
+            moon      = get_body("moon", t_astropy, location)
+            moon_alt  = round(float(moon.transform_to(frame).alt.deg), 2)
+            sun       = get_body("sun",  t_astropy, location)
+            sep       = moon.separation(sun).deg
+            moon_phase = round(
+                min(max((1.0 - math.cos(math.radians(sep))) / 2.0, 0.0), 1.0), 4
+            )
+        except Exception:
+            pass
 
     h = {
-        "SIMPLE": True, "BITPIX": 16, "NAXIS": 2, "NAXIS1": width, "NAXIS2": height, "BZERO": 32768.0, "BSCALE": 1.0,
-        "OBJECT": target.name, "OBJCTRA": _hours_to_hms(target.ra_hours), "OBJCTDEC": _deg_to_dms(target.dec_deg),
-        "CRVAL1": ra_deg, "CRVAL2": target.dec_deg, "CRPIX1": width/2.0, "CRPIX2": height/2.0,
-        "CDELT1": -0.001042, "CDELT2": 0.001042, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
-        "DATE-OBS": utc_obs.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3], "EXPTIME": target.exp_ms / 1000.0,
-        "INSTRUME": INSTRUMENT, "TELESCOP": TELESCOPE, "FILTER": FILTER_NAME, "BAYERPAT": BAYER_PATTERN,
-        "GAIN": GAIN, "FOCALLEN": FOCALLEN, "APERTURE": APERTURE, "PIXSCALE": PIXSCALE, "RDNOISE": RDNOISE, "PEDESTAL": PEDESTAL,
+        "SIMPLE":   True,   "BITPIX": 16,  "NAXIS":  2,
+        "NAXIS1":   width,  "NAXIS2": height,
+        "BZERO":    32768.0, "BSCALE": 1.0,
+        "OBJECT":   target.name,
+        "OBJCTRA":  _hours_to_hms(target.ra_hours),
+        "OBJCTDEC": _deg_to_dms(target.dec_deg),
+        "CRVAL1":   ra_deg,       "CRVAL2": target.dec_deg,
+        "CRPIX1":   width / 2.0,  "CRPIX2": height / 2.0,
+        "CDELT1":  -0.001042,     "CDELT2":  0.001042,
+        "CTYPE1":  "RA---TAN",    "CTYPE2": "DEC--TAN",
+        "DATE-OBS": utc_obs.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3],
+        "EXPTIME":  target.exp_ms / 1000.0,
+        "INSTRUME": INSTRUMENT,   "TELESCOP": TELESCOPE,
+        "FILTER":   FILTER_NAME,  "BAYERPAT": BAYER_PATTERN,
+        "GAIN":     GAIN,         "FOCALLEN": FOCALLEN,
+        "APERTURE": APERTURE,     "PIXSCALE": PIXSCALE,
+        "RDNOISE":  RDNOISE,      "PEDESTAL": PEDESTAL,
         "OBSERVER": target.observer_code or "UNKNOWN",
-        "SITELAT": site_lat, "SITELONG": site_lon, "SITEELEV": site_elev,
+        "SITELAT":  site_lat, "SITELONG": site_lon, "SITEELEV": site_elev,
         "SWCREATE": SWCREATE,
     }
 
     h["CCD-TEMP"] = ccd_temp if ccd_temp is not None else "UNKNOWN"
-    if airmass is not None: h["AIRMASS"] = airmass
+    if airmass    is not None: h["AIRMASS"]   = airmass
     if moon_phase is not None: h["MOONPHASE"] = moon_phase
-    if moon_alt is not None: h["MOONALT"] = moon_alt
-    if target.auid: h["AUID"] = target.auid
+    if moon_alt   is not None: h["MOONALT"]   = moon_alt
+    if target.auid:            h["AUID"]      = target.auid
     h["JD"] = round(t_astropy.jd, 6)
 
     return h
@@ -306,35 +404,44 @@ def sovereign_stamp(target: AcquisitionTarget, utc_obs: datetime, width: int, he
 def write_fits(array: np.ndarray, header_dict: dict, output_path: Path) -> bool:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     array_signed = (array.astype(np.int32) - 32768).astype(np.int16)
-    if array_signed.dtype.byteorder not in (">",): array_signed = array_signed.byteswap().view(array_signed.dtype.newbyteorder(">"))
+    if array_signed.dtype.byteorder not in (">",):
+        array_signed = array_signed.byteswap().view(array_signed.dtype.newbyteorder(">"))
 
     def card(key: str, value, comment: str = "") -> str:
         key = key.upper()[:8].ljust(8)
-        if isinstance(value, bool): val_str = f"{'T' if value else 'F':>20}"
-        elif isinstance(value, int): val_str = f"{value:>20}"
-        elif isinstance(value, float): val_str = f"{value:>20.10G}"
-        elif isinstance(value, str): val_str = f"'{value.replace('\'', '\'\''):<8}'".ljust(20)
-        else: val_str = f"'{str(value):<8}'".ljust(20)
+        if isinstance(value, bool):   val_str = f"{'T' if value else 'F':>20}"
+        elif isinstance(value, int):  val_str = f"{value:>20}"
+        elif isinstance(value, float):val_str = f"{value:>20.10G}"
+        elif isinstance(value, str):  val_str = f"'{value.replace(chr(39), chr(39)*2):<8}'".ljust(20)
+        else:                         val_str = f"'{str(value):<8}'".ljust(20)
         return f"{key}= {val_str}{f' / {comment}' if comment else ''}"[:80].ljust(80)
 
     priority_keys = ["SIMPLE", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "BZERO", "BSCALE"]
-    records = [card(k, header_dict[k]) for k in priority_keys if k in header_dict]
-    records.extend([card(k, v) for k, v in header_dict.items() if k not in priority_keys])
-    records.append("COMMENT   SeeVar v5.1.0 M2 -- BZERO Signed-Integer Protected".ljust(80))
+    records  = [card(k, header_dict[k]) for k in priority_keys if k in header_dict]
+    records += [card(k, v) for k, v in header_dict.items() if k not in priority_keys]
+    records.append("COMMENT   SeeVar v1.7.0 -- BZERO Signed-Integer Protected".ljust(80))
     records.append("END".ljust(80))
 
-    while (len(records) * 80) % 2880 != 0: records.append(" " * 80)
+    while (len(records) * 80) % 2880 != 0:
+        records.append(" " * 80)
+
     header_bytes = "".join(records).encode("ascii")
-    data_bytes = array_signed.tobytes()
-    remainder = len(data_bytes) % 2880
-    if remainder: data_bytes += b"\x00" * (2880 - remainder)
+    data_bytes   = array_signed.tobytes()
+    remainder    = len(data_bytes) % 2880
+    if remainder:
+        data_bytes += b"\x00" * (2880 - remainder)
 
     try:
         with open(output_path, "wb") as f:
             f.write(header_bytes)
             f.write(data_bytes)
         return True
-    except OSError: return False
+    except OSError:
+        return False
+
+# ---------------------------------------------------------------------------
+# Diamond Sequence
+# ---------------------------------------------------------------------------
 
 class DiamondSequence:
     def __init__(self, host: str = SEESTAR_HOST):
@@ -347,97 +454,136 @@ class DiamondSequence:
             t.level_ok = level_ok
             return t
         try:
-            ctrl.send("iscope_stop_view")
+            # Fire-and-forget stops — no response needed
+            _ok, _ = ctrl.send("iscope_stop_view")
+
             gps = _read_gps_ram()
             if gps["lat"] != 0.0 or gps["lon"] != 0.0:
-                ctrl.send("set_user_location", {"lat": gps["lat"], "lon": gps["lon"], "force": True})
+                _ok, _ = ctrl.send("set_user_location",
+                                   {"lat": gps["lat"], "lon": gps["lon"], "force": True})
+
             ctrl.send_and_recv("set_control_value", ["gain", GAIN])
-            
+
             resp_state = ctrl.send_and_recv("get_device_state")
-            telemetry = TelemetryBlock.from_response(resp_state)
+            telemetry  = TelemetryBlock.from_response(resp_state)
             telemetry.level_ok = level_ok
-            
-            if telemetry.veto_reason(): return telemetry
+
+            if telemetry.veto_reason():
+                return telemetry
 
             ctrl.send_and_recv("scope_get_track_state")
-            ctrl.send("scope_set_track_state", [True])
+            _ok, _ = ctrl.send("scope_set_track_state", [True])
             ctrl.send_and_recv("scope_get_ra_dec")
             return telemetry
+
         except Exception as e:
             t = TelemetryBlock(parse_error=f"init_session exception: {e}")
             t.level_ok = level_ok
             return t
-        finally: ctrl.disconnect()
+        finally:
+            ctrl.disconnect()
 
-    def acquire(self, target: AcquisitionTarget, status_cb=None, telemetry: Optional[TelemetryBlock] = None) -> FrameResult:
+    def acquire(self, target: AcquisitionTarget,
+                status_cb=None,
+                telemetry: Optional[TelemetryBlock] = None) -> FrameResult:
+
         def notify(step, msg):
             if status_cb: status_cb(f"[{step}] {msg}")
             logger.info("[%s] %s", step, msg)
 
-        t_start = time.monotonic()
-        utc_obs = datetime.now(timezone.utc)
+        t_start  = time.monotonic()
+        utc_obs  = datetime.now(timezone.utc)
         ccd_temp = telemetry.temp_c if telemetry else None
 
         ctrl = ControlSocket(host=self.host)
-        if not ctrl.connect(): return FrameResult(success=False, error="Control socket connect failed")
+        if not ctrl.connect():
+            return FrameResult(success=False, error="Control socket connect failed")
 
         try:
+            # T1 — Set exposure time
             notify("T1", f"set_setting exp_ms={target.exp_ms} for {target.name}")
-            ctrl.send("set_setting", {"exp_ms": {"stack_l": target.exp_ms}})
+            _ok, _ = ctrl.send("set_setting", {"exp_ms": {"stack_l": target.exp_ms}})
 
+            # T2 — Slew to target
+            # FIRST LIGHT: replace time.sleep with wait_for_event() once
+            # event field names confirmed via ssh_monitor.py on Wilhelmina.
             notify("T2", f"scope_goto RA={target.ra_hours:.4f}h DEC={target.dec_deg:.4f}°")
-            ctrl.send("scope_goto", [target.ra_hours, target.dec_deg])
+            _ok, _ = ctrl.send("scope_goto", [target.ra_hours, target.dec_deg])
             time.sleep(SETTLE_SECONDS)
 
+            # T3 — Autofocus
+            # FIRST LIGHT: confirm get_event_state response shape and add
+            # completion poll. Firmware typo preserved — must be one 's'.
             notify("T3", "start_auto_focuse")
-            ctrl.send("start_auto_focuse")
+            _ok, _ = ctrl.send("start_auto_focuse")
 
+            # T4 — Open frame stream
             notify("T4", "iscope_start_view mode=star")
-            ctrl.send("iscope_start_view", {"mode": "star"})
+            _ok, _ = ctrl.send("iscope_start_view", {"mode": "star"})
             time.sleep(2.0)
+
         except Exception as e:
             ctrl.disconnect()
             return FrameResult(success=False, error=f"Control sequence error: {e}")
 
+        # T5 — Receive science frame on port 4801
         notify("T5", "Receiving RAW frame port 4801...")
         img_sock = ImageSocket(host=self.host, timeout=FRAME_TIMEOUT)
         raw_data, width, height = img_sock.capture_one_preview()
 
+        # T6 — Close stream and check hardware state
         try:
-            ctrl.send("iscope_stop_view")
-            resp_state = ctrl.send_and_recv("get_device_state")
+            _ok, _ = ctrl.send("iscope_stop_view")
+            resp_state    = ctrl.send_and_recv("get_device_state")
             post_telemetry = TelemetryBlock.from_response(resp_state)
             post_telemetry.level_ok = telemetry.level_ok if telemetry else True
             ccd_temp = post_telemetry.temp_c or ccd_temp
             veto = post_telemetry.veto_reason()
             if veto and raw_data is None:
                 return FrameResult(success=False, error=f"Veto + no frame: {veto}")
-        finally: ctrl.disconnect()
+        finally:
+            ctrl.disconnect()
 
-        if raw_data is None: return FrameResult(success=False, error="No preview frame received")
+        if raw_data is None:
+            return FrameResult(success=False, error="No preview frame received")
 
         expected = width * height * 2
-        if len(raw_data) != expected: return FrameResult(success=False, error=f"Payload size mismatch: got {len(raw_data)}, expected {expected}")
+        if len(raw_data) != expected:
+            return FrameResult(success=False,
+                               error=f"Payload size mismatch: got {len(raw_data)}, expected {expected}")
 
+        # T7 — Write FITS
         notify("T7", f"Writing FITS — AUID={target.auid} CCD-TEMP={ccd_temp}")
-        array = np.frombuffer(raw_data, dtype=np.uint16).reshape(height, width)
+        array     = np.frombuffer(raw_data, dtype=np.uint16).reshape(height, width)
         LOCAL_BUFFER.mkdir(parents=True, exist_ok=True)
         safe_name = target.name.replace(" ", "_").replace("/", "-")
         out_path  = LOCAL_BUFFER / f"{safe_name}_{utc_obs.strftime('%Y%m%dT%H%M%S')}_Raw.fits"
 
-        header = sovereign_stamp(target, utc_obs, width, height, ccd_temp=ccd_temp)
-        ok = write_fits(array, header, out_path)
+        header  = sovereign_stamp(target, utc_obs, width, height, ccd_temp=ccd_temp)
+        ok      = write_fits(array, header, out_path)
         elapsed = time.monotonic() - t_start
 
-        if ok: return FrameResult(success=True, path=out_path, width=width, height=height, elapsed_s=elapsed)
+        if ok:
+            return FrameResult(success=True, path=out_path,
+                               width=width, height=height, elapsed_s=elapsed)
         return FrameResult(success=False, error="FITS write failed", elapsed_s=elapsed)
 
+# ---------------------------------------------------------------------------
+# Coordinate helpers
+# ---------------------------------------------------------------------------
+
 def _hours_to_hms(hours: float) -> str:
-    h = int(hours); m = int((hours - h) * 60); s = ((hours - h) * 60 - m) * 60
+    h = int(hours)
+    m = int((hours - h) * 60)
+    s = ((hours - h) * 60 - m) * 60
     return f"{h:02d}:{m:02d}:{s:05.2f}"
 
 def _deg_to_dms(deg: float) -> str:
-    sign = "+" if deg >= 0 else "-"; deg = abs(deg); d = int(deg); m = int((deg - d) * 60); s = ((deg - d) * 60 - m) * 60
+    sign = "+" if deg >= 0 else "-"
+    deg  = abs(deg)
+    d    = int(deg)
+    m    = int((deg - d) * 60)
+    s    = ((deg - d) * 60 - m) * 60
     return f"{sign}{d:02d}:{m:02d}:{s:04.1f}"
 
 if __name__ == "__main__":

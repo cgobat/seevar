@@ -81,11 +81,19 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
     - `bayer_photometry.py`: add `check_green_balance()` — run once per session on bright star
     - Log G1/G2 ratio; if consistently >1% apply as calibration constant
     - Systematic offset would introduce photometry bias across all frames
-  - **pilot.py hardening** — peer review (March 2026)
+  - **pilot.py v1.7.0 hardening** — peer review (March 2026)
     - Port 4700 is a stateful event stream, not request/response
-    - `recv_response()` may catch telemetry push instead of command ACK
-    - `wait_for_event()` on ControlSocket needed — timeout fallback to existing sleep
-    - All event field names are FIRST LIGHT REQUIRED — implement after ssh_monitor.py confirms
+    - `recv_response()` ID-matching fix — loops stream, drops unsolicited Event packets,
+      returns only when matching cmd_id found — eliminates stray telemetry race condition
+    - `send()` returns `tuple[bool, int]` — failure detection + ID for matching
+    - `send_and_recv()` updated to use ID-matched receiver
+    - ✅ Implementable now — structural fix, no hardware required
+  - **pilot.py wait_for_event() — FIRST LIGHT REQUIRED**
+    - T2 slew: replace time.sleep(SETTLE_SECONDS) with event-driven wait
+    - T3 autofocus: replace fire-and-forget with poll until complete
+    - Requires real event field names from ssh_monitor.py on Wilhelmina
+    - SETTLE_SECONDS retained as hard timeout ceiling until confirmed
+    - Implement in v1.8 post-first-light (April 2026)
     - `vsx_catalog.py` restart resilience — nohup job dies on reboot, no auto-restart
 
 * **v1.9 Fliep:** **The Deployment Master — Global Edition.**

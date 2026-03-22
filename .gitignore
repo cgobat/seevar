@@ -71,3 +71,7 @@ venv/
 *.xyls
 catalogs/reference_stars/
 dev/media/
+catalogs/reference_stars/
+dev/media/
+daily_preflight.sh
+git.txt

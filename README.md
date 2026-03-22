@@ -190,9 +190,15 @@ The architecture allows remote telescopes to join the network.
 
 # 🚧 Beta
 
-SeeVar is currently in beta. Hardware testing begins April 2026 with the ZWO Seestar S30-Pro.
+SeeVar is currently in beta.  My hardware testing begins April 2026 with the ZWO Seestar S30-Pro.
 
 Community testers are welcome. Please report issues via [GitHub Issues](https://github.com/edjuh/seevar/issues).
+
+For changes affecting the protocol, state machine, or sequencing:
+
+→ Please do open an issue first to discuss the approach.
+
+PRs without prior discussion may be declined.
 
 ---
 

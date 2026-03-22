@@ -1,7 +1,7 @@
-🗺️ S30-PRO Development Roadmap: The Rommeldam Epic
+# 🗺️ S30-PRO Development Roadmap: The Rommeldam Epic
 
 > **Objective:** Tracks the architectural journey and future versioning milestones of the Seestar Federation, mapped to the characters of Marten Toonder's universe.
-> **Version:** 1.5.0 (Fliep)
+> **Version:** 1.6.0 (Snotolf)
 
 This document outlines the architectural journey of the S30-PRO autonomous observatory, structurally mapped to the characters of Marten Toonder's universe.
 
@@ -41,7 +41,7 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
   - GPLv3 LICENSE added — cgobat's recommendation accepted
   - CONTRIBUTING.md — public facing, Asthonising Automated Variable Star Observatory tagline
   - GitHub topics, description, INSTALL one-liner
-  - Testers: Arenda (tester #1), Boyce-Astro introduction, Metius presentation
+  - Testers: Arenda (tester #1), Boyce-Astro introduction, Metius presentation (March 2026, well received)
 
 ---
 
@@ -49,8 +49,18 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
 *The invisible, tireless workers in the background. Focuses on system resilience and background magic.*
 
 * **v1.8 Snotolf:** **The Hardware Whisperer.** An authentic, slightly spicy underlying system change.
-  - ✅ Weather veto wired into orchestrator _run_idle — RAIN/FOGGY/CLOUDY/WINDY abort session
+  - ✅ Weather veto wired into orchestrator _run_idle — RAIN/FOGGY/WINDY abort session
+  - ✅ Weather logic redesigned — cloud cover is warning only, never abort (v1.8.0)
+    - Hard abort: rain, snow, hail, fog (measured + forecast), thunderstorm, wind
+    - Per-hour evaluation across dark window replaces window_max worst-case
+    - Best contiguous imaging window reported as imaging_window_start/end
+    - Orchestrator reads imaging_go: true/false — not status string
   - ✅ link_status wired from orchestrator telemetry into dashboard (WAITING → ONLINE at first light)
+  - ✅ field_rotation.py v1.0.0 — Young's approximation, max safe exposure per az/alt/lat
+  - ✅ exposure_planner.py v1.2.0 — three-way cap (SNR/saturation/field rotation), chunking, scintillation noise
+  - ✅ bootstrap.sh v1.4.0 — full preflight pipeline runs on install (librarian → audit → planner → compiler)
+  - ✅ kaspar_animation.py v2.0.0 — Manim 1080p60 pipeline animation, YouTube: https://youtu.be/qG439gE7UBo
+  - ✅ PRESENTATION.md — speaker's guide + session notes, docs/PRESENTATION.md
   - Hardware auto-detection via Alpaca UDP + HTTP fingerprint — confirm FIRST LIGHT markers
   - Camera-based automatic horizon profiling at first light
     - S30-Pro pans 360° at low altitude during session init
@@ -60,6 +70,8 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
   - Flat frames pipeline (currently darks only) — peer review confirmed gap
   - Dew heater control — 1% steps via ZWO API, driven by KNMI rh + temp delta
   - Pi Zero 2W / CM5 inside Seestar — sovereign at silicon level (research phase)
+    - ASIAIR Plus kernel build docs confirm ZWO uses standard RPi Linux base
+    - ssh_monitor.py passive log streaming is the correct discovery path
   - All-sky camera — wide angle, one frame/min, cloud cover from brightness variance
   - INA219 power monitoring — current draw, motor stall detection
   - GPS on one Seestar, broadcast fix over LAN to all federation instances
@@ -69,11 +81,18 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
     - `bayer_photometry.py`: add `check_green_balance()` — run once per session on bright star
     - Log G1/G2 ratio; if consistently >1% apply as calibration constant
     - Systematic offset would introduce photometry bias across all frames
+  - **pilot.py hardening** — peer review (March 2026)
+    - Port 4700 is a stateful event stream, not request/response
+    - `recv_response()` may catch telemetry push instead of command ACK
+    - `wait_for_event()` on ControlSocket needed — timeout fallback to existing sleep
+    - All event field names are FIRST LIGHT REQUIRED — implement after ssh_monitor.py confirms
+    - `vsx_catalog.py` restart resilience — nohup job dies on reboot, no auto-restart
 
 * **v1.9 Fliep:** **The Deployment Master — Global Edition.**
   - `config_wizard.py` — re-runnable interactive config tool using tomli_w
   - Kiosk display service (Pi 4 — Pi 3 too slow)
   - KNMI waarschuwingen-nederland-48h — weather warnings as hard abort trigger
+  - `vsx_catalog.py` — add systemd service for restart resilience (currently nohup only)
 
   **Southern Hemisphere Support:**
   - `hemisphere` flag in config.toml (`northern` / `southern`, auto-detected from lat)
@@ -105,12 +124,20 @@ This document outlines the architectural journey of the S30-PRO autonomous obser
 
 ## ☕ Epoch 2: The Women of Rommeldam (v2.x)
 *The caretakers and organizers. Focuses on bringing order, analysis, and presentation to the raw data.*
+
 * **v2.0 Anne Marie Doddel:** **The Hardened Observatory.** Real-time photometric analysis, hardware hardening, and beautiful AAVSO light-curves. First light with Wilhelmina (S30-Pro, April 2026).
   - Vignetting correction — flat-field pipeline fully operational, per-frame correction in `aperture_flux`
   - G1/G2 balance constant applied if diagnostic confirms imbalance > 1%
   - `numba @jit` benchmark on `aperture_flux` mask operations — peer review suggestion
     - Target: 2-5x speedup on Pi 5 when processing hundreds of comp stars per frame
     - Benchmark against numpy baseline on real IMX585 frames
+  - **Comparison star reconciliation** — Gaia DR3 vs AAVSO VSP
+    - `calibration_engine.py` uses Gaia DR3 exclusively (correct for measurement)
+    - `chart_fetcher.py` fetches VSP sequences but they are not consumed — orphaned
+    - Cross-match Gaia comp stars to AAVSO VSP sequences for WebObs-compliant citation labels
+    - AAVSO reporter: Gaia for measurement, VSP label for submission
+    - Decision: wire chart_fetcher into calibration pipeline or deprecate
+
 * **v2.1 Anne-Miebetje:** The classic first sub-version refinement.
 * **v2.2 Wobbe:** A highly stable, technical build.
 * **v2.3 Wolle:** Dedicated to visual graph and plot updates.

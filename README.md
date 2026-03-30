@@ -190,9 +190,15 @@ The architecture allows remote telescopes to join the network.
 
 # 🚧 Beta
 
-SeeVar is currently in beta. Hardware testing begins April 2026 with the ZWO Seestar S30-Pro.
+SeeVar is currently in beta.  My hardware testing begins April 2026 with the ZWO Seestar S30-Pro.
 
 Community testers are welcome. Please report issues via [GitHub Issues](https://github.com/edjuh/seevar/issues).
+
+For changes affecting the protocol, state machine, or sequencing:
+
+→ Please do open an issue first to discuss the approach.
+
+PRs without prior discussion may be declined.
 
 ---
 
@@ -220,3 +226,7 @@ A small telescope, a Raspberry Pi, and careful automation can produce **real sci
 
 The sky has always been open to anyone willing to measure it.
 
+---
+
+"De kosmos is erg groot, en voor een heer alleen is zij eigenlijk te veel. Maar met een groot denkraam komt men een heel eind."
+(Vrij naar Heer Bommel)
